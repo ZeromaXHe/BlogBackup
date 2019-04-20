@@ -97,3 +97,139 @@ staff[0]=boss;
 有时候，可能希望阻止人们利用某个类定义子类。不允许扩展的类被称为final类。如果在定义类的时候使用了final修饰符就表明这个类是final类。
 
 *注释：前面曾经说过，域也可以被声明为final。对于final域来说，构造对象之后就不允许改变它们的值了。不过，如果将一个类声明为final，只有其中的方法自动地成为final，而不包括域。*
+
+将方法或类声明为final主要目的是：确保它们不会在子类中改变语义。
+
+**内联（inline）**：一个方法没被覆盖而且很短，编译器能够对它进行优化处理
+
+### 5.1.5 强制类型转换
+
+子类的引用赋给一个超类，编译器是允许的。但将一个超类的引用赋给一个子类变量，必须进行类型转换，这样才能通过运行时的检查。
+
+instanceof运算符
+
+*注释：x为null，x instanceof C不会产生异常，只是返回false*
+
+尽量少用类型转换和instanceof运算符。
+
+*C++注释：C++dynamic_cast操作*
+
+### 5.1.6 抽象类
+
+只将它作为派生其他类的基类，而不作为想使用的特定实例类。
+
+包含一个或多个抽象方法的类本身必须被声明为抽象的。除了抽象方法之外，抽象类还可以包含具体数据和具体方法。
+
+*提示：建议尽量将通用的域和方法（不管是否是抽象的）放在超类（不管是否是抽象类）中*
+
+抽象方法充当着占位的角色，它们的具体实现在子类中。子类中定义部分抽象方法或抽象方法也不定义，则必须将子类标记为抽象类。全部定义抽象方法才不是抽象的。
+
+类即使不含抽象方法，也可以将类声明为抽象类。
+
+抽象类不能实例化。可以定义一个抽象类的对象变量，但是它只能引用非抽象子类的对象。
+
+*C++注释：尾部用=0标记的抽象方法，称为纯虚函数。有一个纯虚函数，这个类就是抽象类。C++没有提供用于表示抽象类的特殊关键字。*
+
+### 5.1.7 受保护访问
+
+protected，允许子类访问。
+
+*C++注释：Java中的protected概念要比C++中的安全性差。*
+
+## 5.2 Object：所有类的超类
+
+Object类是Java所有类的始祖，在Java中每个类都是由它扩展来的。
+
+如果没有明确指明超类，Object就被认为是这个类的超类。
+
+可以使用Object类型引用任何类型的对象。
+
+在Java中，只有基本类型（primitive types）不是对象。==所有的数组类型，不管是对象数组还是基本类型数组都扩展于Object类。==
+
+*C++注释：在C++中没有所有类的根类，不过每个指针都可以转换为void\*指针。*
+
+### 5.2.1 equals方法
+
+在Object类中，这个方法将判断两个对象是否具有相同的引用。
+
+getClass方法返回一个对象所属的类。
+
+*提示：为了防备.equals前的变量可能为null的情况，需要使用Object.equals(a, b)方法。*
+
+### 5.2.2 相等测试与继承
+
+如果隐式和显式的参数不属于同一个类，equals方法如何处理？类不匹配，返回false。许多程序员喜欢使用instanceof来进行检测，这样做不但没有解决otherObject是子类的情况，并且可能招致一些麻烦。所以不建议使用这种方式。
+
+Java语言规范要求equals方法具有下面特性：
+
+1）自反性
+
+2）对称性
+
+3）传递性
+
+4）一致性
+
+5）非空引用x.equals(null)应该返回false。
+
+下面可以从两个截然不同的情况看一下这个问题：
+
+- 如果子类能够拥有自己相等概念，则对称性需求将强制采用getClass进行检测。
+- 如果超类决定相等概念，那么就可以使用instanceof进行检测，这样可以在不用子类对象之间进行相等的比较。
+
+*注释：标准Java库中包含150多个equals方法实现，包括使用instanceof检测、调用getClass检测、捕获ClassCastException或者什么也不做。*
+
+下面给出编写一个完美的equals方法的建议：
+
+1. 显式参数命名为otherObject， 稍后需要将它转换成另一个叫做other的变量。
+2. 检测this与otherObject是否引用同一个对象。
+3. 检测otherObject是否为null，如果为null，返回false。
+4. 比较this与otherObject是否属于同一类。如果equals的语义在每个子类中有所改变，就用getClass检测。如果都有子类都有统一的语义，就用instanceof检测。
+5. 将otherObject转换为相应的类类型变量
+6. 现在开始对所有需要比较的域进行比较了。使用==比较基本类型域，使用equals比较对象域。如果所有的域都匹配，就返回true；否则返回false。
+
+如果在子类中重新定义equals，就要在其中包含调用super.equals(other)。
+
+*提示：对于数组类型的域，可以使用静态的Arrays.equals方法检测相应的数组元素是否相等。*
+
+*警告：可以使用@Override对覆盖超类的方法进行标记。*
+
+【API】java.util.Arrays 1.2
+
+- `static Boolean equals(type[] a, type[] b)` 5.0
+
+【API】java.util.Objects 7
+
+- `static boolean equals(Object a, Object b)`
+
+### 5.2.3 hashCode方法
+
+**散列码（hash code）**是由对象导出的一个整型值。
+
+hashCode方法定义在Object类中，因此每个对象都有一个默认的散列码，其值为对象的存储地址。
+
+字符串的散列码是由内容导出的。而没有定义hashCode方法的类的散列码是由Object类的默认hashCode方法导出的对象存储地址。
+
+如果重新定义equals方法，就必须重新定义hashCode方法，以便用户可以将对象插入到散列表中。
+
+hashCode方法应该返回一个整型数值（也可以是负数），并合理地组合实例域的散列码，以便能够让各个不同的对象产生的散列码更加均匀。
+
+Java 7中可以做两个改进。首先，最好使用null安全的方法Objects.hashCode. 需要组合多个散列值时，可以调用Object.hash并提供多个参数。这个方法会对各个参数调用Object.hashCode，并组合这些散列值。
+
+*提示：如果存在数组类型的域，那么可以使用静态的Arrays.hashCode方法计算一个散列码，这个散列码由数组元素的散列码组成。*
+
+【API】java.lang.Object 1.0
+
+- `int hashCode()`
+
+【API】java.lang.Objects 7
+
+- `int hash(Object... objects)`
+- `static int hashCode(Object a)`
+
+【API】java.util.Arrays 1.2
+
+- static int hashCode(type[] a) 5.0
+
+### 5.2.4 toString方法
+
