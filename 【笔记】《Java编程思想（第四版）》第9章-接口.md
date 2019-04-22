@@ -38,3 +38,174 @@ interface关键字使抽象的概念更向前迈进了一步。abstract关键字
 
 要让一个类遵循某个特定接口（或者是一组接口），需要使用implements关键字，它表示：“interface只是它的外貌，但是现在我要声明它是如何工作的。”除此之外，它看起来还很像继承。
 
+可以选择在接口中显式地将方法声明为public的，但即使你不这么做，它们也是public的。因此，当要实现一个接口时，在接口中被定义的方法必须被定义是public的；否则，它们将值得到默认的包访问权限，这样在方法继承的过程中，其可访问权限就降低了，这是Java编译器所不允许的。
+
+## 9.3 完全解耦
+
+只要一个方法操作的是类而非接口，那么你就只能使用这个类及其子类。如果你想要将这个方法应用于不在此继承结构中的某个类，那么你就会触霉头了。接口可以在很大程度上放宽这种限制，因此，它使得我们可以编写可复用性更好的代码。
+
+创建一个能够根据所传递参数对象的不同而具有不同行为的方法，被称为**策略**设计模式。这类方法包含所要执行的算法中固定不变的部分，而“策略”包含变化的部分
+
+复用代码的第一种方式是客户端程序员遵循该接口来编写他们自己的类。
+
+你经常碰到的情况是你无法修改你想使用的类。在这些情况下，可以使用**适配器**设计模式。适配器的代码将接受你所拥有的接口，并产生你所需要的接口。
+
+将接口从具体实现中解耦使得接口可以应用于多种不同的具体实现，因此代码也就更具可复用性。
+
+## 9.4 Java中的多重继承
+
+在C++中，组合多个类的接口的行为被称作**多重继承**。在Java中，你可以执行相同的行为，但是只有一个类可以有具体实现；因此，通过组合多个接口，C++中的问题是不会在Java中发生的。
+
+在导出类中，不强制要求必须有一个是抽象的或“具体的”（没有任何抽象方法的）基类。如果要从一个非接口的类继承，那么只能从一个类去继承，其余的基元素都必须是接口。需要将所有的接口名都置于implements关键字之后，用逗号将它们一一隔开。可以继承任意多个接口，并可以向上转型为每个接口，因为每一个接口都是一个独立类型。
+
+前面的例子所展示的就是使用接口的核心原因：为了能够向上转型为多个基类型（以及由此而带来的灵活性）。然而，使用接口的第二个原因却是与使用抽象基类相同：防止客户端程序员创建该类的对象，并确保这仅仅是建立一个接口。这就带来了一个问题：我们应该使用接口还是抽象类？如果要创建不带任何方法定义和成员变量的基类，那么第一选择应该使它成为一个接口（该主题在本章的总结中将再次讨论）。
+
+## 9.5 通过继承来扩展接口
+
+通过继承，可以很容易在接口中添加新的方法声明，还可以通过继承在新接口中组合数个接口。
+
+一般情况下，只可以将extends用于单一类，但是可以引用多个基类接口。就像所看到的，只需用逗号将接口名一一分隔开即可。
+
+### 9.5.1 组合接口时的名字冲突
+
+在前面的例子中，CanFight和ActionCharacter都有一个相同的void fight()方法。这不是问题所在，因为该方法在二者中是相同的。相同的方法不是什么问题，但是如果它们的签名或返回类型不同，又会怎么样呢？
+
+此时困难来了，因为覆盖、实现和重载令人不快地搅在了一起，而且重载方法仅通过返回类型是区分不开的。
+
+在打算组合的不同接口中使用相同的方法名通常会造成代码可读性的混乱，请尽量避免这种情况。
+
+## 9.6 适配接口
+
+接口的一种常见用法就是前面提到的**策略**设计模式，此时你编写一个执行某些操作的方法，而该方法将接受一个同样是你指定的接口。你主要就是要声明：“你可以用任何你想要的对象来调用我的方法，只要你的对象遵循我的接口。”
+
+Readable接口只要求实现read()方法，在read()内部，将输入内容添加到charBuffer参数中，或者在没有任何输入时返回-1。
+
+## 9.7 接口中的域
+
+因为你放入接口中的任何域都自动是static和final的，所以接口就成为了一种很便捷的用来创建常量组的工具。在Java SE5之前，这是产生与C或C++中的enum（枚举类型）具有相同效果的类型的唯一途径。
+
+Java标识具有常量初始化值的static final时，会使用大写字母风格（在一个标识符中用下划线来分隔多个单词）。接口中的域自动是public的，所以没有显式地指明这一点。
+
+有了Java SE5，你就可以使用更加强大而灵活的enum关键字，因此，使用接口来群组常量已经显得没什么意义了。
+
+### 9.7.1 初始化接口中的域
+
+在接口中定义的域不能是“空final”，但是可以被非常量表达式初始化。
+
+既然域是static的，它们就可以在类第一次被加载时初始化，这发生在任何域首次被访问时。
+
+当然，这些域不是接口的一部分，它们的值被存储在该接口的静态存储区域内。
+
+## 9.8 嵌套接口
+
+接口可以嵌套在类或其他接口中。这揭示了许多非常有趣的特性：
+
+```java
+//:interfaces/nesting/NestingInterfaces.java
+package interfaces.nesting;
+class A {
+    interface B{
+        void f();
+    }
+    public class BImp implements B{
+        public void f(){}
+    }
+    private class BImp2 implements B{
+        public void f(){}
+    }
+    public interface C{
+        void f();
+    }
+    class CImp implements C{
+        public void f(){}
+    }
+    private class CImp2 implements C{
+        public void f(){}
+    }
+    private interface D{
+        void f();
+    }
+    private class DImp implements D{
+        public void f(){}
+    }
+    public class DImp2 implements D{
+        public void f(){}
+    }
+    public D getD(){return new DImp2();}
+    private D dRef;
+    public void receiveD(D d){
+        dRef = d;
+        dRef.f();
+    }
+}
+interface E{
+    interface G{
+        void f();
+    }
+	//Redundant "public":
+	public interface H{
+    	void f();
+	}
+	void g();
+    //Cannot be private within an interface:
+    //! private interface I{}
+}
+public class NestingInterfaces{
+    public class BImp implements A.B{
+        public void f(){}
+    }
+    class CImp implements A.C{
+        public void f(){}
+    }
+    //Cannot implement a private interface except within that interface's defining class:
+    //! class DImp implements A.D{
+    //! 	public void f(){}
+    //! }
+    class EImp implements E{
+        public void g(){}
+    }
+    class EGImp implements E.G{
+        public void f(){}
+    }
+    class EImp2 implements E{
+        public void g(){}
+        class EG implements E.G{
+            public void f(){}
+        }
+    }
+    public static void main(String[] args){
+        A a = new A();
+        //Can't access A.D:
+        //! A.D ad = a.getD();
+        //Doesn't return anything but A.D:
+        //! A.DImp2 di2 = a.getD();
+        //Cannot access a member of the interface:
+        //! a.getD().f();
+        //Only another A can do anything with getD();
+        A a2 = new A();
+        a2.receiveD(a.getD());
+    }
+}
+
+
+```
+
+
+
+在类中嵌套接口的语法是相当显而易见的，就像非嵌套接口一样，可以拥有publlic和“包访问”两种可视性。
+
+作为一种新添加的方式，接口也可以被实现为private的。（相同的语法既适用于嵌套接口，也适用于嵌套类）那么private的嵌套接口能带来什么好处呢？读者可能会猜想，它只能够被实现为DImp中的一个private内部类，但是A.DImp2展示了它同样可以被实现为public类。但是，A.DImp2只能被其自身所使用。你无法说它实现了一个private接口D，因此，实现一个private接口只是一种形式，它可以强制该接口中的方法定义不要添加任何类型信息（也就是说，不允许向上转型）。
+
+getD()方法使我们陷入了一个进退两难的境地，这个问题与private接口相关：它是一个返回对private接口的引用的public方法。你对这个方法的返回值能做什么呢？在main()中，可以看到数次试图使用返回值的行为都失败了。只有一种方式可成功，那就是将返回值交给有权使用它 的对象。在本例中，是另一个A通过receiveD()方法来实现的。
+
+接口E说明接口彼此之间也可以嵌套。==然而，作用于接口的各种规则，特别是所有的接口元素都必须是public的，在此都会被严格执行。==因此，嵌套在另一个接口中的接口自动就是public的，而不能声明为private。
+
+NestingInterfaces 展示了嵌套接口的各种实现方式。特别需要注意的是，当实现某个接口时，并不需要实现嵌套在其内部的任何接口。而且，private接口不能在定义它的类之外被实现。
+
+## 9.9 接口与工厂
+
+接口是实现多重继承的途径，而生成遵循某个接口的对象的典型方式就是**工厂方法**设计模式。这与直接调用构造器不同，我们在工厂对象上调用的是创建方法，而该工厂对象将生成接口的某个实现对象。理论上，通过这种方式，我们的代码将完全与接口的实现分离，这就使得我们可以透明地将某个实现替换为另一个实现。
+
+为什么我们想要添加这种额外级别的间接性呢？一个常见的原因是想要创建框架。
+
+在下一章中，你将可以看到另一种更加优雅的工厂实现方式，那就是使用匿名内部类。

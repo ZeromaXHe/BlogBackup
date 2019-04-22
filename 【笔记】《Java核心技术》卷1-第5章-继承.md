@@ -233,3 +233,407 @@ Java 7中可以做两个改进。首先，最好使用null安全的方法Objects
 
 ### 5.2.4 toString方法
 
+在Object中还有一个重要的方法，就是toString方法，它用于返回表示对象值的字符串。下面是一个典型的例子。Point类的toString方法将返回下面这样的字符串：
+
+`java.awt.Point[x=10,y=20]`
+
+绝大多数（但不是全部）的toString方法都遵循这样的格式：类的名字，随后是一对方括号括起来的域值。
+
+随处可见toString方法的主要原因是：只要对象与一个字符串通过操作符"+"连接起来，Java编译就会自动地调用toString方法，以便获得这个对象的字符串描述。
+
+*提示：在调用x.toString()的地方可以用""+x替代。与toString不同的是，如果x是基本类型，这条语句照样能够执行。*
+
+Object类定义了toString方法，用来打印输出对象所属的类名和散列码。
+
+*警告：数组继承了Object类的toString方法。修正的方式是调用静态方法Arrays.toString。要想打印多维数组（即，数组的数组）则需要调用Arrays.deepToString方法。*
+
+toString方法是一种非常有用的调试工具。读者在第11章将可以看到，更好的解决方法是：`Logger.global.info("Current position = "+position);`
+
+*提示：强烈建议为自定义的每一个类增加toString方法。这样做不仅自己受益，而且所有使用这个类的程序员也会从这个日志记录支持中受益匪浅。*
+
+【API】java.lang.Object 1.0：
+
+- `Class getClass()`
+- `boolean equals (Object otherObject)`
+- `String toString()`
+
+【API】java.lang.Class 1.0 ：
+
+- `String getName()`
+- `Class getSuperClass()`
+
+## 5.3 泛型数组列表
+
+C语言中必须在编译时就确定整个数组的大小。
+
+Java中，允许在运行时确定数组的大小。
+
+一旦确定了数组的大小，改变它就太不容易了。在Java中，解决这个问题的最简单方法是使用Java中另外一个被称为ArrayList的类。它添加或删除元素时，具有自动调节数组容量的功能，而不需要为此编写任何代码。
+
+ArrayList是一个采用类型参数（type parameter）的泛型类（generic class）。为了指定数组列表保存的元素对象类型，需要用一对尖括号将类名括起来加在后面，例如，ArrayList\<Employee>。在第13章将可以看到如何自定义一个泛型类。
+
+Java7中，可以省去右边的类型参数：`ArrayList<Employee> staff = new ArrayList<>();`
+
+这被称为"菱形"语法，因为空尖括号\<>就像一个菱形。
+
+*注释：Java SE 5.0以前的版本没有提供泛型类，而是有一个ArrayList类，其中保存类型为Object的元素，它是"自适应大小"的集合。在Java SE 5.0以后的版本中，没有后缀\<...> 仍然可以使用ArrayList，它将被认为是一个删去了类型参数的"原始"类型。*
+
+*注释：在Java老版本中，程序员使用Vector类实现动态数组。不过ArrayList类更加有效，没有任何理由一定要用Vector类。*
+
+使用add方法可以将元素添加到ArrayList中。
+
+ArrayList管理着对象引用的一个内部数组。如果调用add且内部数组已经满了，ArrayList将自动地创建一个更大的数组，并将所有对象拷贝到较大数组中。
+
+如果已经清楚或能估计出数组可能存储的元素数量，就可以在填充数组之前调用ensureCapacity方法。
+
+另外还可以把初始容量传递给ArrayList构造器：`ArrayList<Employee> staff = new ArrayList<>(100);`
+
+*警告：数组列表和数组大小有一个非常重要的区别。如果为数组分配100个元素的存储空间，数组就有100个空位置可以使用。而容量为100个元素的数组列表只是拥有保存100个元素的潜力（实际上，重新分配空间的话，将会超过100），但是在最初，甚至完成初始化构造之后，数组列表根本就不含有任何元素。*
+
+size方法将返回数组列表中包含的实际元素数目。它等价于数组a的a.length。
+
+一旦能够确认数组列表的大小不再发生变化，就可以调用trimToSize方法。这个方法将存储区域的大小调整为当前元素数量所需要的存储空间数目。垃圾回收器将回收多余的存储空间。
+
+*C++注释：ArrayList类似于C++的vector模板。ArrayList与vector都是泛型类型。但是C++的vector模板为了便于访问元素重载了[ ]运算符。由于Java没有运算符重载，所以必须调用显示的方法。此外，C++向量是值拷贝，a=b会构造一个和b长度一样的新向量a。而在Java中，让a和b引用同一个数组列表。*
+
+【API】java.util.ArrayList\<T> 1.2：
+
+- `ArrayList<T>()`
+- `ArrayList<T>(int initialCapacity)`
+- `boolean add(T obj)`
+- `int size()`
+- `void ensureCapacity(int capacity)`
+- `void trimToSize()`
+
+### 5.3.1 访问数组列表元素
+
+使用get和set方法实现访问或改变数组元素的操作，而不使用人们喜爱的[]语法格式。
+
+`staff.set(i,harry);`等价于数组a的元素赋值（下表从0开始）：`a[i]=harry;`
+
+*警告：只有i小于或等于数组列表的大小时，才能够调用list.set(i,x)。使用add方法为数组添加新元素，而不要使用set方法，它只能替换数组中已经存在的元素内容。*
+
+`Employee e = staff.get(i);`等价于`Employee e =a[i];`
+
+*注释：没有泛型类时，原始的ArrayList类提供的get方法别无选择只能返回Object，因此，get方法的调用者必须对返回值进行类型转换。*
+
+*原始的ArrayList存在一定的危险性。它的add和set方法允许接受任意类型的对象。*
+
+toArray方法将数组元素拷贝到一个数组中。
+
+带索引参数的add方法，可以在数组列表中间插入元素。为了插入一个新元素，位于n之后的所有元素都要向后移动一个位置。如果插入新元素后，数组列表的大小超过了容量，数组列表就会被重新分配存储空间。
+
+同样的可从数组列表中间删除一个元素。`Employee e = staff.remove(n);`位于这个位置之后的所有元素都向前移动一个位置，并且数组的大小减1。
+
+对数组实施插入和删除元素的操作效率比较低。考虑使用链表，有关链表操作的实现方式将在第13章中讲述。
+
+可以使用“for each”循环遍历数组列表。`for(Employee e : staff)`
+
+【API】java.util.ArrayList\<T> 1.2：
+
+- `void set(int index, T obj)`
+- `T get(int index)`
+- `void add(int index, T obj)`
+- `T remove(int index)`
+
+### 5.3.2 类型化与原始数组列表的兼容性
+
+可以将一个类型化的数组列表传递给参数是原始类型的方法，而不需要进行任何类型转换。
+
+*警告：尽管编译器没有给出任何错误信息或警告，但是这样的调用并不安全。这与在Java中增加泛型之前是一样的。既没降低安全性，也没受益于编译时的检查。*
+
+相反的，将一个原始ArrayList赋给一个类型化ArrayList会得到一个警告。
+
+*注释：为了能够看到警告性错误文字信息，要将编译选项置为-Xlint:unchecked。*
+
+使用类型转换并不能避免出现警告。这样会得到另一个警告信息，被告知类型转换有误。
+
+鉴于兼容性的考虑，编译器在对类型转换进行检查之后，如果没有违反规则的现象，就将所有的类型化数组列表转换成原始ArrayList对象。在程序运行时，所有的数组列表都是一样的，即没有虚拟机中的类型参数。
+
+一旦能确保不会造成严重的后果，可以用@SuppressWarnings("unchecked")标注来标记这个变量能够接受类型转换。
+
+## 5.4 对象包装器与自动装箱
+
+**包装器（wrapper）**：对象包装器类——Integer、Long、Float、Double、Short、Byte、Character、Void和Boolean（前面6个类派生于公共的超类Number）。对象包装器类是不可变的，即一旦构造了包装器，就不允许更改包装在其中的值。同时，对象包装器还是final，因此不能定义它们的子类。
+
+假设想定义一个整型数组列表。而尖括号中的类型参数不允许是基本类型，也就是说，不允许写成ArrayList\<int>。这里就用到了Integer对象包装器类。。我们可以声明一个Integer对象的数组列表。`ArrayList<Integer> list = new ArrayList<>();`
+
+*警告：由于每个值分别包装在对象中，所以ArrayList\<Integer>的效率远远低于int[]数组。因此，应该用它构造小型集合，其原因是此时程序员操作的方便性要比执行效率更加重要。*
+
+Java SE 5.0 的另一个改进之处是更加便于添加或获得数组元素。下面这个调用`list.add(3);`将自动地变换成`list.add(Integer,valueOf(3));`这种变换被称为自动装箱（autoboxing）。
+
+*注释：大家可能认为自动打包（autowrapping）更加合适，而"装箱（boxing）"这个词源自于C#。*
+
+相反地，当将一个Integer对象赋给一个int值时，将会自动地拆箱。也就是说，编译器将下列语句：`int n = list.get(i);`翻译成`int n = list.get(i).intValue();`甚至在算术表达式中也能够自动地装箱和拆箱。
+
+在很多情况下，容易有一种假象，即基本类型和它们的对象包装器是一样的，只是它们相等性不同。解决这个问题的方法是在两个包装器对象比较时调用equals方法。
+
+*注释：自动装箱规范要求boolean、byte、char<=127，介于-128~127之间的short和int被包装到固定对象中。例如，如果在前面的例子中将a和b初始化为100，对它们进行比较的结果一定成立*
+
+最后强调一下，装箱和拆箱是编译器认可的，而不是虚拟机。编译器在生成类的字节码时，插入必要的方法调用。虚拟机只是执行这些字节码。
+
+使用数值对象包装器还有另外 一个好处。Java设计这发现，可以将某些基本方法放置在包装器中，例如Integer.parseInt(s)将字符串转换成整型。这里与Integer对象没有任何关系，parseInt是一个静态方法。但Integer类是放置这个方法的好地方。
+
+*警告：有些人认为包装器类可以用来实现修改数值参数的方法，然而这是错误的。Integer对象是不可变的。*
+
+【API】java.lang.Integer 1.0：
+
+- `int intValue()`
+- `static String toString(int i)`
+- `static String toString(int i, int radix)`
+- `static int parseInt(String s)`
+- `static int parseInt(String s, int radix)`
+- `static Integer valueOf(String s)`
+- `static Integer valueOf(String s, int radix)`
+
+【API】java.text.NumberFormat 1.1：
+
+- `Number parse(String s)`
+
+## 5.5 参数数量可变的方法
+
+在Java SE 5.0以前的版本中，每个Java方法都有固定数量的参数。然而现在的版本提供了可以用可变参数数量调用的方法（有时称为"变参"方法）。
+
+... 是Java代码的一部分，它表明这个方法可以接收任意数量的对象。
+
+对于printf的实现者来说，Object...参数类型与Object[]完全一样。
+
+*注释：允许将一个数组传递给可变参数方法的最后一个参数。因此可以将已经存在且最后一个参数是数组的方法重新定义为可变参数的方法，而不会破坏任何已经存在的代码。例如，MassageFormat.format在Java SE 5.0就采用了这种方式。甚至可以将main方法声明为String... args形式*
+
+## 5.6 枚举类
+
+比较两个枚举类型的值时，永远不需要调用equals，而直接使用“==”就可以了。
+
+如果需要的话，可以在枚举类型中添加一些构造器、方法和域。当然，构造器只是在构造枚举常量的时候被调用。下面是一个示例：
+
+``` java
+public enum Size{
+    SMALL("S"),MEDIUM("M"),LARGE("L"),EXTRA_LARGE("XL");
+    private String abbreviation;
+    private Size(String abbreviation){this.abbreviation = abbreviation;}
+    public String getAbbreviation(){return abbreviation;}
+}
+```
+
+所有的枚举类型都是Enum类的子类。它们继承了这个类的许多方法。其中最有用的一个是toString，这个方法能够返回枚举常量名。例如，Size.SMALL.toString()将返回字符串“SMALL”。
+
+toString的逆方法是静态方法valueOf。例如，语句：`Size s = Enum.valueOf(Size.class, "CLASS");`将s设置成Size.SMALL。
+
+每个枚举类型都有一个静态的values方法，它返回一个包含全部枚举值的数组。例如，如下调用`Size[] values = Size.values();`返回包含元素Size.SMALL，Size.MEDIUM，Size.LARGE 和 Size.EXTRA_LARGE的数组。
+
+ordinal方法返回enum声明中枚举常量的位置，位置从0开始计数。例如Size.MEDIUM.ordinal()返回1。
+
+*注释：如图Class类一样，鉴于简化的考虑，Enum类省略了一个类型参数，例如实际上，应该将枚举类型Size扩展为Enum\<Size>。类型参数在compareTo方法中使用（compareTo方法在第6章中介绍，类型参数在第12章中介绍）。*
+
+【API】java.lang.Enum \<E> 5.0：
+
+- `static Enum valueOf(Class enumClass, String name)`
+- `String toString()`
+- `int ordinal()`
+- `int compareTo(E other)`
+
+## 5.7 反射
+
+**反射库（reflection library）**提供了一个非常丰富且精心设计的工具集，以便编写能够动态操纵Java代码的程序。这项功能被大量应用于JavaBeans中，它是Java组件的体系结构（有关JavaBeans的详细内容在卷II中阐述）。
+
+能够分析类能力的程序称为**反射（reflective）**。反射机制可以用来：
+
+- 在运行中分析类的能力
+- 在运行中查看对象，例如，编写一个toString方法供所有类使用。
+- 实现通用的数组操作代码。
+- 利用Method对象，这个对象很像C++中的函数指针。
+
+反射是一种功能强大且复杂的机制。使用它的主要人员是工具构造者，而不是应用程序员。如果仅对设计应用程序感兴趣，而对构造工具不感兴趣，可以跳过本章的剩余部分，稍后再回来学习。
+
+### 5.7.1 Class类
+
+程序运行期间，Java运行时系统始终为所有的对象维护一个被称为运行时的类型标识。
+
+保存这些信息的类被称为Class。Object类中的getClass()方法将会返回一个Class类型的实例。
+
+最常用的Class方法是getName()。这个方法将返回类的名字。如果类在一个包里，包的名字也作为类名的一部分。
+
+还可以调用静态方法forName获得类名对应的Class对象。当然，这个方法只有在className是类名或接口名时才能够执行。否则，forName方法将抛出一个checked exception（已检查异常）。无论何时使用这个方法，都应该提供一个**异常处理器（exception handler）**。如何提供一个异常处理器，请参看下一节。
+
+*提示：使用下面这个技巧给用户一种启动速度比较快的幻觉。要确保包含main方法的类没有显式地引用其他的类。首先，显式一个启动画面；然后通过调用Class.forName手工地加载其他的类。*
+
+获得Class类对象的第三种方法非常简单。如果T是任意的Jave类型，T.class将代表匹配的类对象。
+
+请注意，一个Class对象实际上表示的是一个类型，而这个类型未必一定是一种类。例如，int不是类，但int.class是一个Class类型的对象。
+
+*注释：从Java SE 5.0 开始，Class类已参数化。例如，Class\<Employee>的类型是Employee.class。没有说明这个问题的原因是，它将已经抽象的概念复杂化了。在大多数实际问题中，可以忽略类型参数，而使用原始的Class类。有关这个问题更详细的论述请参看第13章。*
+
+*警告：鉴于历史原因，getName方法在应用于数组类型的时候会返回一个很奇怪的名字：`Double[].class.getName()`返回"[Ljava.lang.Double;"。`int[].class.getName`返回"[I"。*
+
+虚拟机为每个类型管理一个Class对象。因此，可以利用==运算符实现两个类对象比较的操作。
+
+还有一个很有用的方法newInstance()，可以用来快速地创建一个类的实例。newInstance调用默认的构造器初始化新构件的对象，如果这个类没有默认的构造器，就会抛出一个异常。
+
+*注释：如果需要以这种方式向希望按名称创建的类的构造器提供参数，就必须使用Constructor类中的newInstance方法。*
+
+*C++注释：newInstance方法对应C++虚拟构造器的习惯用法。然而C++中的虚拟构造器不是一种语言特性，需要由专门的库支持。Class类与C++中的type_info类相似，getClass方法与C++中的type_info只能以字符串的形式显示一个类型的名字，而不能创建那个类型的对象。*
+
+### 5.7.2 捕获异常
+
+第11章 异常处理机制
+
+抛出异常 “捕获”异常的**处理器（handler）**
+
+没有提供处理器，程序就会终止，并在控制台上打印出一条信息，其中给出了异常的类型。例如，null引用或者数组越界等。
+
+异常有两种类型：未检查异常和已检查异常。对于已检查异常，编译器会检查是否提供了处理器。
+
+Throwable类 printStackTrace方法打印出栈的轨迹。Throwable是Exception类的超类
+
+调用了一个抛出已检查异常的方法，而又没有提供处理器，编译器就会给出错误报告。
+
+【API】java.lang.Class 1.0：
+
+- `static Class forName(String className)`
+
+- `Object newInstance()`
+
+【API】java.lang.reflect.Constructor 1.1：
+
+- `Object newInstance(Object[] args)`
+
+【API】java.lang.Throwable 1.0：
+
+- `void printStackTrace()`
+
+### 5.7.3 利用反射分析类的能力
+
+反射机制最重要的内容——检查类的结构。
+
+在java.lang.reflect包中有三个类Field、Method和Constructor分别用于描述类的域、方法和构造器。这三个类都有一个叫做getName的方法，用来返回项目的名称。Field类有一个getType方法，用来返回描述域所属类型的Class对象。Method和Constructor类有能够报告参数类型的方法，Method类还有一个可以报告返回类型的方法。这三个类还有一个叫getModifiers的方法，它将返回一个整型数值，用不同的位开关描述public和static这样的修饰符使用情况。另外，还可以利用java.lang.reflect包中的Modifier类的静态方法分析getModifiers返回的整型数值。例如可以使用Modifier类中的isPublic、isPrivate或isFinal判断方法或构造器是否是public、private或final。还可以利用Modifier.toString方法将修饰符打印出来。
+
+Class类中的getFields、getMethods和getConstructors方法将分别返回类提供的public域、方法和构造器数组，其中包括超类的公有成员。Class类的getDeclareFields、getDeclareMethods和getDeclaredConstructors方法将分别返回类中声明的全部域、方法和构造器，其中包括私有和受保护成员，但不包括超类的成员。
+
+【API】java.lang.Class 1.0
+
+- `Field[] getFields()` 1.1
+- `Field[] getDeclaredFields()` 1.1
+- `Method[] getMethods()` 1.1
+- `Method[] getDeclareMethods()` 1.1
+- `Constructor[] getConstructors()` 1.1
+- `Constructor[] getDeclaredConstructors()` 1.1
+
+【API】java.lang.reflect.Field 1.1：
+
+【API】java.lang.reflect.Method 1.1 :
+
+【API】java.lang.reflect.Constructor 1.1 :
+
+- `Class getDeclaringClass()`
+- `Class[] getExceptionTypes()`（在Constructor和Method类中）
+- `int getModifiers()`
+- `String getName()`
+- `Class[] getParameterTypes()`（在Constructor和Method类中）
+- `Class getReturnType()`（在Method类中）
+
+【API】java.lang.reflect.Modifier 1.1 :
+
+- `static String toString(int modifiers)`
+- `static boolean isAbstract(int modifiers)`
+- `static boolean isFinal(int modifiers)`
+- `static boolean isInterface(int modifiers)`
+- `static boolean isNative(int modifiers)`
+- `static boolean isPrivate(int modifiers)`
+- `static boolean isProtected(int modifiers)`
+- `static boolean isPublic(int modifiers)`
+- `static boolean isStatic(int modifiers)`
+- `static boolean isStrict(int modifiers)`
+- `static boolean isSynchronized(int modifiers)`
+- `static boolean isVolatile(int modifiers)`
+
+### 5.7.4 在运行时使用反射分析对象
+
+如何查看任意对象的数据域名称和类型：
+
+- 获得对应的Class对象。
+- 通过Class对象调用getDeclaredFields。
+
+查看对象域的关键方法是Field类的get方法。如果f是一个Field类型的对象（例如，通过getDeclaredFields得到的对象），obj是某个包含f域的类的对象，f.get(obj)将返回一个对象，其值为obj域的当前值。
+
+反射机制的默认行为受限于Java的访问控制。Field、Method或Constructor对象的setAccessable方法
+
+setAccessable方法是AccessibleObject类的一个方法，它是Field、Method和Constructor类的公共超类。这个特性是为调试、持久存储和相似机制提供的。本书稍后将利用它编写一个通用的toString方法。
+
+Field类中的getDouble方法，也可以调用get方法，此时反射机制会自动地将这个域值打包到相应的对象包装器中。
+
+f.set(obj, value)可以将obj对象的f域设置成新值。
+
+【API】java.lang.reflect.AccessibleObject 1.2 :
+
+- `void setAccessible(boolean flag)`
+- `boolean isAccessible()`
+- `static void setAccessible(AccessibleObject[] array, boolean flag)`
+
+【API】java.lang.Class 1.1 :
+
+- `Field getField(String name)`
+- `Field[] getField()`
+- `Field[] getDeclaredField(String name)`
+- `Field[] getDeclaredFields()`
+
+【API】java.lang.reflect.Field 1.1 :
+
+- `Object get(Object obj)`
+- `void set(Object obj, Object newValue)`
+
+### 5.7.5 使用反射编写泛型数组代码
+
+Array类中的copyOf方法实现
+
+需要java.lang.reflect包中Array类的一些方法。Array类中的静态方法newInstance
+
+Array.getLength(a)获得数组的长度，也可以通过Array类的静态getLength方法的返回值得到任意数组的长度。
+
+Class类的getComponentType方法确定数组对应的类型。
+
+【API】java.lang.reflect.Array 1.1 :
+
+- `static Object get(Object array, int index)`
+- `static xxx getXxx(Object array, int index)`
+- `static void set(Object array, int index, Object newValue)`
+- `static setXxx(Object array, int index, xxx newValue)`
+- `static int getLength(Object array)`
+- `static Object newInstance(Class componentType, int length)`
+- `static Object newInstance(Class componentType, iny[] lengths)`
+
+### 5.7.6 调用任意方法
+
+Java没有提供方法指针
+
+Java设计者认为接口是一种更好的解决方案。然而，反射机制允许你调用任意方法。
+
+*注释：J++（以及后来的C#）委托（delegate），它与本节讨论的Method类不同。内部类比委托更加有用*
+
+Method类invoke方法，允许调用包装在当前Method对象中的方法。
+
+如何得到Method对象？getDeclaredMethods方法，然后对返回的Method对象数组进行查找，知道发现想要的方法为止。也可以通过调用Class类中的getMethod方法得到想要的方法。
+
+设计风格不太简便，出错可能性也较大。参数和返回值必须是Object类型的。比仅仅直接调用方法明显慢一些。
+
+有鉴于此，建议仅在必要时候才使用Method对象。建议不要使用Method对象的回调功能。
+
+【API】java.lang.reflect.Method 1.1 :
+
+- `public Object invoke(Object implicitParameter, Object[] explicitParameters)`
+
+## 5.8 继承设计的技巧
+
+1）将公共操作和域放在超类
+
+2）不要使用受保护的域
+
+3）使用继承实现“is-a”关系
+
+4）除非所有继承方法都有意义，否则不要使用继承。
+
+5）在覆盖方法时，不要改变预期的行为。
+
+6）使用多态，而非类型信息。
+
+7）不要过多地使用反射。
+
