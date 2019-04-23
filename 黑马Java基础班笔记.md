@@ -149,6 +149,8 @@ JDK9新特性
 | `Ctrl+/`             | 单行注释                               |
 | `Ctrl+Shift+/`       | 选中代码注释，多行注释，再按取消注释   |
 | `Alt+Shift+上下箭头` | 移动当前代码行                         |
+| `Alt+Insert`         | 插入构造方法、getter&setter等          |
+| `Ctrl+(Fn)+F6`       | 重命名变量                             |
 
 ## 数组
 
