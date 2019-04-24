@@ -187,4 +187,36 @@ Map可以返回它的键的Set，它的值的Collection，或者它的键值对�
 
 LinkedList提供了方法以支持队列的行为，并且它实现了Queue接口，因此LinkedList可以用做Queue的一种实现。通过将LinkedList向上转型为Queue。
 
-offer()
+offer()方法是与Queue相关方法之一，它在允许的情况下，将一个元素插入到队尾，或者返回false，peek()和element()都将在不移除的情况下返回队头，但是peek()方法在队列为空时返回null，而element()会抛出NoSuchElementException异常。poll()和remove()方法将移除并返回队头，但是poll()在队列为空时返回null,而remove()会抛出NoSuchElementException异常。
+
+自动包装机制会自动地将nextInt()方法的int结果转换为queue所需的Integer对象，将char c转换为qc所需的Character对象，Queue接口窄化了对LinkedList的方法的访问权限，以使得只有恰当的方法才可以使用，因此，你能够访问的LinkedList方法会变少（这里你实际上可以将queue转型回LinkedList，但是至少我们不鼓励这么做）。
+
+注意，与Queue相关的方法提供了完整而独立的功能。即，对于Queue所继承的Collection，在不需要使用它的任何方法的情况下，就可以拥有一个可用的Queue。
+
+### 11.11.1 PriorityQueue
+
+先进先出描述了最典型的队列规则。队列规则是指在给定一组队列中的元素的情况下，确定下一个弹出队列的元素的规则。先进先出声明的是下一个元素应该是等待时间最长的元素、
+
+优先级队列声明下一个弹出元素是最需要的元素（具有最高优先级）
+
+offer()	Comparator	peek()	poll()	remove()
+
+## 11.12 Collection和Iterator
+
+Java中，遵循C++的方式看起来似乎很明智，即用迭代器而不是Collection来表示容器之间的共性。但是两种方法绑定到了一起，因为实现Collection就意味着需要提供Iterator()方法。
+
+生成Iterator是将队列与消费队列的方法链接在一起耦合度最小的方式，并且与实现Collection相比，它在序列类上所施加的约束也少得多。
+
+## 11.13 Foreach与迭代器
+
+foreach语法主要用于数组，但是它也可以应用于任何Collection对象的特性。
+
+称为Iterable的接口
+
+System.getenv()返回一个Map，entrySet()产生一个由Map.Entry的元素构成的Set，并且这个Set是一个Iterable，因此它可以用于foreach循环。
+
+不存在任何从数组到Iterable的自动转换
+
+### 11.13.1 适配器方法惯用法
+
+“适配器”部分来自于设计模式，因为你必须提供特定接口以满足foreach语句。
