@@ -48,12 +48,11 @@ Double.compare静态方法，如果第一个参数小于第二个参数，它会
 
 - `static int compare(double x, double y)` 1.4   如果 x < y 返回一个负数；如果 x 和 y 相等则返回 0; 否则返回一个负数 
 
-*注释：语 言 标 准 规 定： 对 于 任 意 的 x 和 y, 实 现 必 须 能 够 保 证 sgn(x.compareTo(y)) = -sgn(y.compareTo(x)。) （也 就 是 说， 如 果 y.compareTo(x) 抛 出 一 个 异 常， 那 么 x.compareTo(y) 也 应 该 抛 出 一 个 异 常。）这 里 的“ sgn” 是 一 个 数 值 的 符 号： 如 果 n 是 负 值， sgn（n） 等于 -1 ; 如 果 n 是 0, sgn(n) 等 于 0 ; 如 果 n 是 正 值， sgn（n）等 于 1 简 单 地 讲， 如 果 调 换compareTo 的 参 数， 结 果 的 符 号 也 应 该 调 换 （而 不 是 实 际 值）*
+*注释：语 言标准规定：对于任意的x和y,实现必须能够保证 sgn(x.compareTo(y)) = -sgn(y.compareTo(x)。) （也就是说， 如果 y.compareTo(x) 抛出一个异常， 那么 x.compareTo(y) 也应该抛出一个异常。）这里的“ sgn” 是一个数值的符号： 如果n是负值， sgn（n） 等于 -1 ; 如果 n 是 0, sgn(n) 等于 0 ; 如果 n 是正值， sgn（n）等于 1 简单地讲， 如果调换compareTo 的参数， 结果的符号也应该调换 （而不是实际值）*
 
-*与 equals 方 法 一 样， 在 继 承 过 程 中 有 可 能 会 出 现 问 题。*
+*与 equals 方法一样， 在继承过程中有可能会出现问题。*
 
-*这 种 情 况 与 第 5 章 中 讨 论 的 equals 方 法 一 样， 修 改 的 方 式 也 一 样 ， 有 两 种 不 同 的
-情 况*
+*这种情况与第5章中讨论的 equals 方法一样， 修改的方式也一样 ，有两种不同的情况*
 
 ### 6.1.2 接口的特性
 
