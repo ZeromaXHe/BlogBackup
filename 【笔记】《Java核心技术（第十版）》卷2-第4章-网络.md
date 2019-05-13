@@ -169,3 +169,123 @@ try(Socket socket = new Socket(host, port)){
 如果不想处理缓冲区，可以使用Scanner类从SocketChannel中读取信息，因为Scanner有一个带ReadableByteChannel参数的构造器。
 
 通过调用静态方法Channels.newOutputStream，可以将通道转换成输出流。
+
+【API】java.net.InetSocketAddress 1.4 :
+
+- `InetSocketAddress(String hostname, int port)`
+- `boolean isUnresolved()`
+
+【API】java.nio.channels.SocketChannel 1.4 :
+
+- `static SocketChannel open(SocketAddress address)`
+
+【API】java.nio.channels.Channels 1.4 :
+
+- `static InputStream newInputStream(ReadableByteChannel channel)`
+- `static OutputStream newOutputStream(WritableByteChannel channel)`
+
+## 4.4 获取Web数
+
+### 4.4.1 URL和URI
+
+URL和URLConnection类封装了大量复杂的实现细节，这些细节涉及如何从远程站点获取信息。
+
+如果只是想获得该资源的内容，可以使用URL类中的openStream方法。
+
+java.net包对统一资源定位符（Uniform Resource Locator，URL）和统一资源标识符（Uniform Resource Identifier，URI）做了非常有用的区分。
+
+URI是个纯粹的语法结构，包含用来指定Web资源的字符串的各种组成部分。URL是URI的一个特例，它包含了用于定位Web资源的足够信息。其他URI，比如`mailto:cay@horstmann.com`则不属于定位符，因为根据该标识符我们无法定位任何数据。像这样的URI我们称之为URN（Uniform Resource Name，统一资源名称）。
+
+在Java类库中，URI类并不包含任何用于访问资源的方法，它的唯一作用就是解析。但是，URL类可以打开一个到达资源的流。因此，URL类只能作用于那些Java类库知道该如何处理的模式，例如http:、https:、ftp:、本地文件系统（file:）和JAR文件（jar:）。
+
+一个URI具有以下句法：
+
+`[scheme:]schemeSpecificPart[#fragment]`
+
+上式中，[...]表示可选部分，并且:和#可以被包含在标识符内。
+
+包含scheme:部分的URI称为绝对URI。否则，称为相对URI。
+
+如果绝对URI的schemeSpecificPart不是以/开头的，我们就称它是不透明的。
+
+所有绝对的透明URI和所有相对URI都是分层的（hierarchical）。
+
+一个分层URI的schemeSpecificPart具有以下结构：`[//authority][path][?query]`在这里，[...]同样表示可选部分。
+
+对于那些基于服务器的URI，authority部分具有以下形式：`[user-info@]host[:port]`port必须是个整数。
+
+解析相对URL
+
+相对化（relativization）
+
+### 4.4.2 使用URLConnection获取信息
+
+如果想从某个Web资源获取更多信息，那么应该使用URLConnection类，通过它能够得到比基本的URL类更多的控制功能。
+
+当操作一个URLConnection对象时，必须像下面这样非常小心地安排操作步骤：
+
+1）调用URL类中的openConnection方法获得URLConnection对象
+
+2）使用以下方法来设置任意的请求属性
+
+3）调用connect方法连接远程资源
+
+4）与服务器建立连接后，你可以查询头信息。
+
+5）最后，访问资源数据。使用getInputStream方法获取一个输入流用以读取信息。
+
+*警告：一些程序员在属于URLConnection类的过程中形成了错误的概念，他们认为URLConnection类中的getInputStream和getOutputStream方法与Socket类中的这些方法相似，但是这种想法并不十分正确。URLConnection类具有很多表象之下的神奇功能，尤其在处理请求和响应消息头时。正因为如此，严格遵循建立连接的每个步骤显得非常重要。*
+
+【API】java.net.URL 1.0 :
+
+- `InputStream openStream()`
+- `URLConnection openConnection()`
+
+【API】java.net.URLConnection 1.0 :
+
+- `void setDoInput(boolean doInput)`
+- `boolean getDoInput()`
+- `void setDoOutput(boolean doOutput)`
+- `boolean getDoOutput()`
+- `void setIfModifiedSince(long time)`
+- `long getIfModifiedSince()`
+- `void setUseCaches(boolean useCaches)`
+- `boolean getUseCaches()`
+- `void setAllowUserInteraction(boolean allowUserInteraction)`
+- `boolean getAllowUserInteraction()`
+- `void setConnectTimeout(int timeout)` 5.0
+- `int getConnectTimeout()` 5.0
+- `void setReadTimeout(int timeout)` 5.0
+- `int getReadTimeout()` 5.0
+- `void setRequestProperty(String ket, String value)`
+- `Map<String, List<String>> getRequestProperties()` 1.4
+- `String getHeaderFieldKey(int n)`
+- `String getHeaderField(int n)`
+- `int getContentLength()`
+- `String getContentType()`
+- `String getContentEncoding()`
+- `long getDate()`
+- `long getExpiration()`
+- `long getLastModified()`
+- `InputStream getInputStream()`
+- `OutputStream getOutputStream()`
+- `Object getContent()`
+
+### 4.4.3 提交表单数据
+
+有许多技术可以让Web服务器实现对程序的调用。其中最广为人知的是Java Servlet、JavaServer Face、微软的ASP（Active Server Pages，动态服务器主页）以及CGI（Common Gateway Interface，通用网关接口）脚本。
+
+【API】java.net.HttpURLConnection 1.0 :
+
+- `InputStream getErrorStream()`
+
+【API】java.net.URLEncoder 1.0 :
+
+- `static String encode(String s, String encoding)` 1.4
+
+【API】java.net.URLDecoder 1.2 :
+
+- `static String decode(String s, String encoding)` 1.4
+
+## 4.5 发送E-mail
+
