@@ -2975,7 +2975,492 @@ Spring
 
 spring中是如何进行依赖注入的，依赖注入的原理
 
-讲一讲spring的事务特性
+
+
+
+
+## 讲一讲spring的事务特性
+
+https://blog.csdn.net/trigl/article/details/50968079 (《Spring事务管理（详解+实例）》)
+
+### ACID
+
+事务有四个特性：ACID
+
+> - 原子性（Atomicity）：事务是一个原子操作，由一系列动作组成。事务的原子性确保动作要么全部完成，要么完全不起作用。
+> - 一致性（Consistency）：一旦事务完成（不管成功还是失败），系统必须确保它所建模的业务处于一致的状态，而不会是部分完成部分失败。在现实中的数据不应该被破坏。
+> - 隔离性（Isolation）：可能有许多事务会同时处理相同的数据，因此每个事务都应该与其他事务隔离开来，防止数据损坏。
+> - 持久性（Durability）：一旦事务完成，无论发生什么系统错误，它的结果都不应该受到影响，这样就能从任何系统崩溃中恢复过来。通常情况下，事务的结果被写到持久化存储器中。
+
+### 核心接口
+
+Spring事务管理的实现有许多细节，如果对整个接口框架有个大体了解会非常有利于我们理解事务，下面通过讲解Spring的事务接口来了解Spring实现事务的具体策略。 
+
+Spring事务管理涉及的接口的联系如下：
+
+![img](E:\个人文件\博客\Java面试题目库题解.assets\20160324011156424)
+
+#### 2.1 事务管理器
+
+Spring并不直接管理事务，而是提供了多种事务管理器，他们将事务管理的职责委托给Hibernate或者JTA等持久化机制所提供的相关平台框架的事务来实现。 
+
+Spring事务管理器的接口是org.springframework.transaction.PlatformTransactionManager，通过这个接口，Spring为各个平台如JDBC、Hibernate等都提供了对应的事务管理器，但是具体的实现就是各个平台自己的事情了。此接口的内容如下：
+
+~~~java
+Public interface PlatformTransactionManager()...{  
+    // 由TransactionDefinition得到TransactionStatus对象
+    TransactionStatus getTransaction(TransactionDefinition definition) throws TransactionException; 
+    // 提交
+    Void commit(TransactionStatus status) throws TransactionException;  
+    // 回滚
+    Void rollback(TransactionStatus status) throws TransactionException;  
+    } 
+~~~
+
+从这里可知具体的具体的事务管理机制对Spring来说是透明的，它并不关心那些，那些是对应各个平台需要关心的，所以Spring事务管理的一个优点就是为不同的事务API提供一致的编程模型，如JTA、JDBC、Hibernate、JPA。下面分别介绍各个平台框架实现事务管理的机制。
+
+##### 2.1.1 JDBC事务
+
+如果应用程序中直接使用JDBC来进行持久化，DataSourceTransactionManager会为你处理事务边界。为了使用DataSourceTransactionManager，你需要使用如下的XML将其装配到应用程序的上下文定义中：
+
+```xml
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource" />
+    </bean>
+```
+
+实际上，DataSourceTransactionManager是通过调用java.sql.Connection来管理事务，而后者是通过DataSource获取到的。通过调用连接的commit()方法来提交事务，同样，事务失败则通过调用rollback()方法进行回滚。
+
+##### 2.1.2 Hibernate事务
+
+如果应用程序的持久化是通过Hibernate实习的，那么你需要使用HibernateTransactionManager。对于Hibernate3，需要在Spring上下文定义中添加如下的`<bean>`声明：
+
+```xml
+    <bean id="transactionManager" class="org.springframework.orm.hibernate3.HibernateTransactionManager">
+        <property name="sessionFactory" ref="sessionFactory" />
+    </bean>
+```
+
+sessionFactory属性需要装配一个Hibernate的session工厂，HibernateTransactionManager的实现细节是它将事务管理的职责委托给org.hibernate.Transaction对象，而后者是从Hibernate Session中获取到的。当事务成功完成时，HibernateTransactionManager将会调用Transaction对象的commit()方法，反之，将会调用rollback()方法。
+
+##### 2.1.3 Java持久化API事务（JPA）
+
+Hibernate多年来一直是事实上的Java持久化标准，但是现在Java持久化API作为真正的Java持久化标准进入大家的视野。如果你计划使用JPA的话，那你需要使用Spring的JpaTransactionManager来处理事务。你需要在Spring中这样配置JpaTransactionManager：
+
+```xml
+    <bean id="transactionManager" class="org.springframework.orm.jpa.JpaTransactionManager">
+        <property name="sessionFactory" ref="sessionFactory" />
+    </bean>
+```
+
+JpaTransactionManager只需要装配一个JPA实体管理工厂（javax.persistence.EntityManagerFactory接口的任意实现）。JpaTransactionManager将与由工厂所产生的JPA EntityManager合作来构建事务。
+
+##### 2.1.4 Java原生API事务
+
+如果你没有使用以上所述的事务管理，或者是跨越了多个事务管理源（比如两个或者是多个不同的数据源），你就需要使用JtaTransactionManager：
+
+```xml
+    <bean id="transactionManager" class="org.springframework.transaction.jta.JtaTransactionManager">
+        <property name="transactionManagerName" value="java:/TransactionManager" />
+    </bean>
+```
+
+JtaTransactionManager将事务管理的责任委托给javax.transaction.UserTransaction和javax.transaction.TransactionManager对象，其中事务成功完成通过UserTransaction.commit()方法提交，事务失败通过UserTransaction.rollback()方法回滚。
+
+#### 2.2 基本事务属性的定义
+
+上面讲到的事务管理器接口PlatformTransactionManager通过getTransaction(TransactionDefinition definition)方法来得到事务，这个方法里面的参数是TransactionDefinition类，这个类就定义了一些基本的事务属性。 
+
+那么什么是事务属性呢？事务属性可以理解成事务的一些基本配置，描述了事务策略如何应用到方法上。事务属性包含了5个方面，如图所示：
+
+![img](E:\个人文件\博客\Java面试题目库题解.assets\20160325003448793)
+
+而TransactionDefinition接口内容如下：
+
+```java
+public interface TransactionDefinition {
+    int getPropagationBehavior(); // 返回事务的传播行为
+    int getIsolationLevel(); // 返回事务的隔离级别，事务管理器根据它来控制另外一个事务可以看到本事务内的哪些数据
+    int getTimeout();  // 返回事务必须在多少秒内完成
+    boolean isReadOnly(); // 事务是否只读，事务管理器能够根据这个返回值进行优化，确保事务是只读的
+} 
+```
+
+我们可以发现TransactionDefinition正好用来定义事务属性，下面详细介绍一下各个事务属性。
+
+##### 2.2.1 传播行为
+
+事务的第一个方面是传播行为（propagation behavior）。当事务方法被另一个事务方法调用时，必须指定事务应该如何传播。例如：方法可能继续在现有事务中运行，也可能开启一个新事务，并在自己的事务中运行。Spring定义了七种传播行为：
+
+| 传播行为                  | 含义                                                         |
+| ------------------------- | ------------------------------------------------------------ |
+| PROPAGATION_REQUIRED      | 表示当前方法必须运行在事务中。如果当前事务存在，方法将会在该事务中运行。否则，会启动一个新的事务 |
+| PROPAGATION_SUPPORTS      | 表示当前方法不需要事务上下文，但是如果存在当前事务的话，那么该方法会在这个事务中运行 |
+| PROPAGATION_MANDATORY     | 表示该方法必须在事务中运行，如果当前事务不存在，则会抛出一个异常 |
+| PROPAGATION_REQUIRED_NEW  | 表示当前方法必须运行在它自己的事务中。一个新的事务将被启动。如果存在当前事务，在该方法执行期间，当前事务会被挂起。如果使用JTATransactionManager的话，则需要访问TransactionManager |
+| PROPAGATION_NOT_SUPPORTED | 表示该方法不应该运行在事务中。如果存在当前事务，在该方法运行期间，当前事务将被挂起。如果使用JTATransactionManager的话，则需要访问TransactionManager |
+| PROPAGATION_NEVER         | 表示当前方法不应该运行在事务上下文中。如果当前正有一个事务在运行，则会抛出异常 |
+| PROPAGATION_NESTED        | 表示如果当前已经存在一个事务，那么该方法将会在嵌套事务中运行。嵌套的事务可以独立于当前事务进行单独地提交或回滚。如果当前事务不存在，那么其行为与PROPAGATION_REQUIRED一样。注意各厂商对这种传播行为的支持是有所差异的。可以参考资源管理器的文档来确认它们是否支持嵌套事务 |
+
+*注：以下具体讲解传播行为的内容参考自Spring事务机制详解* 
+
+（1）PROPAGATION_REQUIRED 如果存在一个事务，则支持当前事务。如果没有事务则开启一个新的事务。
+
+```java
+//事务属性 PROPAGATION_REQUIRED
+methodA{
+    ……
+    methodB();
+    ……
+}
+```
+
+~~~java
+//事务属性 PROPAGATION_REQUIRED
+methodB{
+   ……
+}
+~~~
+
+使用spring声明式事务，spring使用AOP来支持声明式事务，会根据事务属性，自动在方法调用之前决定是否开启一个事务，并在方法执行之后决定事务提交或回滚事务。
+
+单独调用methodB方法：
+
+~~~java
+main{ 
+    metodB(); 
+}  
+~~~
+
+相当于
+
+~~~java
+Main{ 
+    Connection con=null; 
+    try{ 
+        con = getConnection(); 
+        con.setAutoCommit(false); 
+
+        //方法调用
+        methodB(); 
+
+        //提交事务
+        con.commit(); 
+    } Catch(RuntimeException ex) { 
+        //回滚事务
+        con.rollback();   
+    } finally { 
+        //释放资源
+        closeCon(); 
+    } 
+} 
+~~~
+
+Spring保证在methodB方法中所有的调用都获得到一个相同的连接。在调用methodB时，没有一个存在的事务，所以获得一个新的连接，开启了一个新的事务。
+单独调用MethodA时，在MethodA内又会调用MethodB.
+
+执行效果相当于：
+
+~~~java
+main{ 
+    Connection con = null; 
+    try{ 
+        con = getConnection(); 
+        methodA(); 
+        con.commit(); 
+    } catch(RuntimeException ex) { 
+        con.rollback(); 
+    } finally {    
+        closeCon(); 
+    }  
+} 
+~~~
+
+调用MethodA时，环境中没有事务，所以开启一个新的事务.当在MethodA中调用MethodB时，环境中已经有了一个事务，所以methodB就加入当前事务。
+
+（2）PROPAGATION_SUPPORTS 如果存在一个事务，支持当前事务。如果没有事务，则非事务的执行。但是对于事务同步的事务管理器，PROPAGATION_SUPPORTS与不使用事务有少许不同。
+
+~~~java
+//事务属性 PROPAGATION_REQUIRED
+methodA(){
+  methodB();
+}
+
+//事务属性 PROPAGATION_SUPPORTS
+methodB(){
+  ……
+}
+~~~
+
+单纯的调用methodB时，methodB方法是非事务的执行的。当调用methdA时,methodB则加入了methodA的事务中,事务地执行。
+
+（3）PROPAGATION_MANDATORY 如果已经存在一个事务，支持当前事务。如果没有一个活动的事务，则抛出异常。
+
+~~~java
+//事务属性 PROPAGATION_REQUIRED
+methodA(){
+    methodB();
+}
+
+//事务属性 PROPAGATION_MANDATORY
+    methodB(){
+    ……
+}
+~~~
+
+当单独调用methodB时，因为当前没有一个活动的事务，则会抛出异常throw new IllegalTransactionStateException(“Transaction propagation ‘mandatory’ but no existing transaction found”);当调用methodA时，methodB则加入到methodA的事务中，事务地执行。
+
+（4）PROPAGATION_REQUIRES_NEW 总是开启一个新的事务。如果一个事务已经存在，则将这个存在的事务挂起。
+
+~~~java
+//事务属性 PROPAGATION_REQUIRED
+methodA(){
+    doSomeThingA();
+    methodB();
+    doSomeThingB();
+}
+
+//事务属性 PROPAGATION_REQUIRES_NEW
+methodB(){
+    ……
+}
+~~~
+
+调用A方法：
+
+~~~java
+main(){
+    methodA();
+}
+~~~
+
+相当于
+
+~~~java
+main(){
+    TransactionManager tm = null;
+    try{
+        //获得一个JTA事务管理器
+        tm = getTransactionManager();
+        tm.begin();//开启一个新的事务
+        Transaction ts1 = tm.getTransaction();
+        doSomeThing();
+        tm.suspend();//挂起当前事务
+        try{
+            tm.begin();//重新开启第二个事务
+            Transaction ts2 = tm.getTransaction();
+            methodB();
+            ts2.commit();//提交第二个事务
+        } Catch(RunTimeException ex) {
+            ts2.rollback();//回滚第二个事务
+        } finally {
+            //释放资源
+        }
+        //methodB执行完后，恢复第一个事务
+        tm.resume(ts1);
+        doSomeThingB();
+        ts1.commit();//提交第一个事务
+    } catch(RunTimeException ex) {
+        ts1.rollback();//回滚第一个事务
+    } finally {
+        //释放资源
+    }
+}
+~~~
+
+在这里，我把ts1称为外层事务，ts2称为内层事务。从上面的代码可以看出，ts2与ts1是两个独立的事务，互不相干。Ts2是否成功并不依赖于 ts1。如果methodA方法在调用methodB方法后的doSomeThingB方法失败了，而methodB方法所做的结果依然被提交。而除了 methodB之外的其它代码导致的结果却被回滚了。使用PROPAGATION_REQUIRES_NEW,需要使用 JtaTransactionManager作为事务管理器。
+
+（5）PROPAGATION_NOT_SUPPORTED 总是非事务地执行，并挂起任何存在的事务。使用PROPAGATION_NOT_SUPPORTED,也需要使用JtaTransactionManager作为事务管理器。（代码示例同上，可同理推出）
+
+（6）PROPAGATION_NEVER 总是非事务地执行，如果存在一个活动事务，则抛出异常。
+
+（7）PROPAGATION_NESTED如果一个活动的事务存在，则运行在一个嵌套的事务中. 如果没有活动事务, 则按TransactionDefinition.PROPAGATION_REQUIRED 属性执行。这是一个嵌套事务,使用JDBC 3.0驱动时,仅仅支持DataSourceTransactionManager作为事务管理器。需要JDBC 驱动的java.sql.Savepoint类。有一些JTA的事务管理器实现可能也提供了同样的功能。使用PROPAGATION_NESTED，还需要把PlatformTransactionManager的nestedTransactionAllowed属性设为true;而 nestedTransactionAllowed属性值默认为false。
+
+~~~java
+//事务属性 PROPAGATION_REQUIRED
+methodA(){
+    doSomeThingA();
+    methodB();
+    doSomeThingB();
+}
+
+//事务属性 PROPAGATION_NESTED
+methodB(){
+    ……
+}
+~~~
+
+如果单独调用methodB方法，则按REQUIRED属性执行。如果调用methodA方法，相当于下面的效果：
+
+~~~java
+main(){
+    Connection con = null;
+    Savepoint savepoint = null;
+    try{
+        con = getConnection();
+        con.setAutoCommit(false);
+        doSomeThingA();
+        savepoint = con2.setSavepoint();
+        try{
+            methodB();
+        } catch(RuntimeException ex) {
+            con.rollback(savepoint);
+        } finally {
+            //释放资源
+        }
+        doSomeThingB();
+        con.commit();
+    } catch(RuntimeException ex) {
+        con.rollback();
+    } finally {
+        //释放资源
+    }
+}
+~~~
+
+当methodB方法调用之前，调用setSavepoint方法，保存当前的状态到savepoint。如果methodB方法调用失败，则恢复到之前保存的状态。但是需要注意的是，这时的事务并没有进行提交，如果后续的代码(doSomeThingB()方法)调用失败，则回滚包括methodB方法的所有操作。
+
+嵌套事务一个非常重要的概念就是内层事务依赖于外层事务。外层事务失败时，会回滚内层事务所做的动作。而内层事务操作失败并不会引起外层事务的回滚。
+
+PROPAGATION_NESTED 与PROPAGATION_REQUIRES_NEW的区别:它们非常类似,都像一个嵌套事务，如果不存在一个活动的事务，都会开启一个新的事务。使用 PROPAGATION_REQUIRES_NEW时，内层事务与外层事务就像两个独立的事务一样，一旦内层事务进行了提交后，外层事务不能对其进行回滚。两个事务互不影响。两个事务不是一个真正的嵌套事务。同时它需要JTA事务管理器的支持。
+
+使用PROPAGATION_NESTED时，外层事务的回滚可以引起内层事务的回滚。而内层事务的异常并不会导致外层事务的回滚，它是一个真正的嵌套事务。DataSourceTransactionManager使用savepoint支持PROPAGATION_NESTED时，需要JDBC 3.0以上驱动及1.4以上的JDK版本支持。其它的JTA TrasactionManager实现可能有不同的支持方式。
+
+PROPAGATION_REQUIRES_NEW 启动一个新的, 不依赖于环境的 “内部” 事务. 这个事务将被完全 commited 或 rolled back 而不依赖于外部事务, 它拥有自己的隔离范围, 自己的锁, 等等. 当内部事务开始执行时, 外部事务将被挂起, 内务事务结束时, 外部事务将继续执行。
+
+另一方面, PROPAGATION_NESTED 开始一个 “嵌套的” 事务, 它是已经存在事务的一个真正的子事务. 潜套事务开始执行时, 它将取得一个 savepoint. 如果这个嵌套事务失败, 我们将回滚到此 savepoint. 潜套事务是外部事务的一部分, 只有外部事务结束后它才会被提交。
+
+由此可见, PROPAGATION_REQUIRES_NEW 和 PROPAGATION_NESTED 的最大区别在于, PROPAGATION_REQUIRES_NEW 完全是一个新的事务, 而 PROPAGATION_NESTED 则是外部事务的子事务, 如果外部事务 commit, 嵌套事务也会被 commit, 这个规则同样适用于 roll back.
+
+PROPAGATION_REQUIRED应该是我们首先的事务传播行为。它能够满足我们大多数的事务需求。
+
+##### 2.2.2 隔离级别
+
+事务的第二个维度就是隔离级别（isolation level）。隔离级别定义了一个事务可能受其他并发事务影响的程度。
+
+（1）并发事务引起的问题
+在典型的应用程序中，多个事务并发运行，经常会操作相同的数据来完成各自的任务。并发虽然是必须的，但可能会导致一下的问题。
+
+> - 脏读（Dirty reads）——脏读发生在一个事务读取了另一个事务改写但尚未提交的数据时。如果改写在稍后被回滚了，那么第一个事务获取的数据就是无效的。
+> - 不可重复读（Nonrepeatable read）——不可重复读发生在一个事务执行相同的查询两次或两次以上，但是每次都得到不同的数据时。这通常是因为另一个并发事务在两次查询期间进行了更新。
+> - 幻读（Phantom read）——幻读与不可重复读类似。它发生在一个事务（T1）读取了几行数据，接着另一个并发事务（T2）插入了一些数据时。在随后的查询中，第一个事务（T1）就会发现多了一些原本不存在的记录。
+
+**不可重复读与幻读的区别**
+
+不可重复读的重点是修改:
+同样的条件, 你读取过的数据, 再次读取出来发现值不一样了
+例如：在事务1中，Mary 读取了自己的工资为1000,操作并没有完成
+
+~~~java
+	con1 = getConnection();  
+    select salary from employee empId ="Mary";  
+~~~
+
+在事务2中，这时财务人员修改了Mary的工资为2000,并提交了事务.
+
+```java
+    con2 = getConnection();  
+    update employee set salary = 2000;  
+    con2.commit();  
+```
+
+在事务1中，Mary 再次读取自己的工资时，工资变为了2000
+
+```java
+    //con1  
+    select salary from employee empId ="Mary"; 
+```
+
+在一个事务中前后两次读取的结果并不一致，导致了不可重复读。
+
+幻读的重点在于新增或者删除：
+同样的条件, 第1次和第2次读出来的记录数不一样
+例如：目前工资为1000的员工有10人。事务1,读取所有工资为1000的员工。
+
+```java
+    con1 = getConnection();  
+    Select * from employee where salary =1000; 
+```
+
+共读取10条记录
+
+这时另一个事务向employee表插入了一条员工记录，工资也为1000
+
+```java
+con2 = getConnection();  
+Insert into employee(empId,salary) values("Lili",1000);  
+con2.commit();  
+```
+事务1再次读取所有工资为1000的员工
+
+```java
+    //con1  
+    select * from employee where salary =1000; 
+```
+
+共读取到了11条记录，这就产生了幻像读。
+
+从总的结果来看, 似乎不可重复读和幻读都表现为两次读取的结果不一致。但如果你从控制的角度来看, 两者的区别就比较大。
+对于前者, 只需要锁住满足条件的记录。
+对于后者, 要锁住满足条件及其相近的记录。
+
+（2）隔离级别
+
+| 隔离级别                  | 含义                                                         |
+| ------------------------- | ------------------------------------------------------------ |
+| ISOLATION_DEFAULT         | 使用后端数据库默认的隔离级别                                 |
+| ISOLATION_READ_INCOMMITED | 最低的隔离级别，允许读取尚未提交的数据变更，可能会导致脏读、幻读或不可重复读 |
+| ISOLATION_READ_COMMITTED  | 允许读取并发事务已经提交的数据，可以阻止脏读，但是幻读或不可重复读仍有可能发生 |
+| ISOLATION_REPEATABLE_READ | 对同一字段的多次读取结果都是一致的，除非数据是被本身事务自己所修改，可以阻止脏读和不可重复读，但幻读仍有可能发生 |
+| ISOLATION_SERIALIZABLE    | 最高的隔离级别，完全服从ACID的隔离级别，确保阻止脏读、不可重复读以及幻读，也是最慢的事务隔离级别，因为它通常是通过完全锁定事务相关的数据库表来实现的 |
+
+##### 2.2.3 只读
+
+事务的第三个特性是它是否为只读事务。如果事务只对后端的数据库进行该操作，数据库可以利用事务的只读特性来进行一些特定的优化。通过将事务设置为只读，你就可以给数据库一个机会，让它应用它认为合适的优化措施。
+
+##### 2.2.4 事务超时
+
+为了使应用程序很好地运行，事务不能运行太长的时间。因为事务可能涉及对后端数据库的锁定，所以长时间的事务会不必要的占用数据库资源。事务超时就是事务的一个定时器，在特定时间内事务如果没有执行完毕，那么就会自动回滚，而不是一直等待其结束。
+
+##### 2.2.5 回滚规则
+
+事务五边形的最后一个方面是一组规则，这些规则定义了哪些异常会导致事务回滚而哪些不会。默认情况下，事务只有遇到运行期异常时才会回滚，而在遇到检查型异常时不会回滚（这一行为与EJB的回滚行为是一致的）
+但是你可以声明事务在遇到特定的检查型异常时像遇到运行期异常那样回滚。同样，你还可以声明事务遇到特定的异常不回滚，即使这些异常是运行期异常。
+
+#### 2.3 事务状态
+
+上面讲到的调用PlatformTransactionManager接口的getTransaction()的方法得到的是TransactionStatus接口的一个实现，这个接口的内容如下：
+
+~~~java
+public interface TransactionStatus{
+    boolean isNewTransaction(); // 是否是新的事物
+    boolean hasSavepoint(); // 是否有恢复点
+    void setRollbackOnly();  // 设置为只回滚
+    boolean isRollbackOnly(); // 是否为只回滚
+    boolean isCompleted; // 是否已完成
+} 
+~~~
+
+可以发现这个接口描述的是一些处理事务提供简单的控制事务执行和查询事务状态的方法，在回滚或提交的时候需要应用对应的事务状态。
+
+### 3 编程式事务
+
+#### 3.1 编程式和声明式事务的区别
+
+Spring提供了对编程式事务和声明式事务的支持，编程式事务允许用户在代码中精确定义事务的边界，而声明式事务（基于AOP）有助于用户将操作与事务规则进行解耦。
+简单地说，编程式事务侵入到了业务代码里面，但是提供了更加详细的事务管理；而声明式事务由于基于AOP，所以既能起到事务管理的作用，又可以不影响业务代码的具体实现。
+
+
+
+
+
+
+
+
+
+
+
+
 
 spring bean的实例化过程。 ——不熟悉的地方不要写上去。
 
@@ -2987,9 +3472,224 @@ AOP 动态代理
 
 Spring 问题，IOC、AOP、代理模式，JDK 和 CGLIB 区别，代理模式底层实现，对 IOC 的理解
 
-一个类里面有两个方法A和B，方法A有@Transaction，B没有，但B调用了A，外界调用B会不会触发事务？
 
-spring中用到的设计模式
+
+
+
+## 一个类里面有两个方法A和B，方法A有@Transaction，B没有，但B调用了A，外界调用B会不会触发事务？
+
+https://blog.csdn.net/u010235716/article/details/90171802 （《@Transactional 同一个类中无事务方法a()内部调用有事务方法b()的问题》）
+
+### 1. 事务的4种特性
+
+| 序号 | 参数                  | 含义                                                         |
+| ---- | --------------------- | ------------------------------------------------------------ |
+| 1    | 原子性（Atomicity）   | 事务是数据库的逻辑工作单位，它对数据库的修改要么全部执行，要么全部不执行。 |
+| 2    | 一致性（Consistency） | 事务前后，数据库的状态都满足所有的完整性约束。               |
+| 3    | 隔离性（Isolation）   | 并发执行的事务是隔离的，一个不影响一个。通过设置数据库的隔离级别，可以达到不同的隔离效果 |
+| 4    | 持久性（Durability）  | 在事务完成以后，该事务所对数据库所作的更改便持久的保存在数据库之中，并不会被回滚。 |
+
+### 2.Transactional（）控制事务传播的配置项目（默认Propagation.REQUIRED）
+
+~~~java
+@Transactional(propagation=Propagation.REQUIRED)           //控制事务传播。默认是Propagation.REQUIRED
+@Transactional(isolation=Isolation.DEFAULT)                //控制事务隔离级别。默认跟数据库的隔离级别相同
+@Transactional(readOnly=false)                             //控制事务可读写、只可读。默认可读写
+@Transactional(timeout=30)                                 //控制事务的超时时间，单位秒。默认跟数据库的事务控制系统相同
+@Transactional(rollbackFor=RuntimeException.class)         //控制事务遇到哪些异常会回滚。默认是RuntimeException
+@Transactional(rollbackForClassName=RuntimeException)      //同上
+@Transactional(noRollbackFor=NullPointerException.class)   //控制事务遇到哪些异常不会回滚。默认遇到RuntimeException回滚
+@Transactional(noRollbackForClassName=NullPointerException)//同上
+~~~
+
+### 3.事务的7种传播特性
+
+| 序号 | 传播行为      | 含义                                                         |
+| ---- | ------------- | ------------------------------------------------------------ |
+| 1    | REQUIRED      | 如果存在一个事务，则支持当前事务。如果没有事务则开启一个新的事务。 |
+| 2    | SUPPORTS      | 如果存在一个事务，支持当前事务。如果没有事务，则非事务的执行 |
+| 3    | MANDATORY     | 如果已经存在一个事务，支持当前事务。如果没有一个活动的事务，则抛出异常。 |
+| 4    | NESTED        | 如果一个活动的事务存在，则运行在一个嵌套的事务中。如果没有活动事务，则按REQUIRED属性执行 |
+| 5    | NEVER         | 总是非事务地执行，如果存在一个活动事务，则抛出异常           |
+| 6    | REQUIRES_NEW  | 总是开启一个新的事务。如果一个事务已经存在，则将这个已经存在的事务挂起 |
+| 7    | NOT_SUPPORTED | 总是非事务地执行，并挂起任何存在的事务                       |
+
+### 4.事务的传播案例：
+
+事务在A类的a()方法中调用B类的b()方法的传播案例
+
+| B.b()的事务配置 | a()没有事务的结果    | a()有事务的结果                                            |
+| --------------- | -------------------- | ---------------------------------------------------------- |
+| REQUIRED        | b()创建自己的事务;   | b()接受a()的事务                                           |
+| SUPPORTS        | b()不创建自己的事务; | b()接受a()的事务                                           |
+| MANDATORY       | b()报异常            | b()接受a()的事务                                           |
+| NESTED          | b()创建自己的事务;   | b()接受a()的事务，成为a()嵌套的子事务                      |
+| NEVER           | b()不创建自己的事务; | b()报异常                                                  |
+| REQUIRES_NEW    | b()创建自己的事务;   | b()不接受a()的事务，b()先执行,内层事务失败不会影响外层事务 |
+| NOT_SUPPORTED   | b()不创建自己的事务; | b()不接受a()的事务，b()先执行                              |
+
+### 5.特殊案例分析：
+
+Java案例：无事务a()方法中调用同一个类的有事务b()方法问题案例
+
+声明式事务基于Spring AOP实现,将具体业务逻辑与事务处理解耦，在 Spring 的 AOP 代理下，只有目标方法由外部调用，目标方法才由 Spring 生成的代理对象来管理，这会造成自调用问题。
+
+即：
+
+==同一类中a()方法没有@Transactional 注解，在其内部调用有@Transactional 注解的方法，有@Transactional 注解的方法b()的事务被忽略，不会发生回滚。==
+
+
+
+
+
+## spring中用到的设计模式
+
+https://www.cnblogs.com/AndyAo/p/8666385.html (《Spring中的用到的设计模式大全》)
+
+spring中常用的设计模式达到九种，我们举例说明：
+
+### 第一种：简单工厂
+
+又叫做静态工厂方法（StaticFactory Method）模式，但不属于23种GOF设计模式之一。 
+简单工厂模式的实质是由一个工厂类根据传入的参数，动态决定应该创建哪一个产品类。 
+spring中的BeanFactory就是简单工厂模式的体现，根据传入一个唯一的标识来获得bean对象，但是否是在传入参数后创建还是传入参数前创建这个要根据具体情况来定。如下配置，就是在 HelloItxxz 类中创建一个 itxxzBean。
+
+~~~xml
+<beans>
+    <bean id="singletonBean" class="com.itxxz.HelloItxxz">
+        <constructor-arg>
+            <value>Hello! 这是singletonBean!value>
+        </constructor-arg>
+   </ bean>
+    <bean id="itxxzBean" class="com.itxxz.HelloItxxz" singleton="false">
+        <constructor-arg>
+            <value>Hello! 这是itxxzBean! value>
+        </constructor-arg>
+    </bean>
+</beans>
+~~~
+
+### 第二种：工厂方法（Factory Method）
+
+
+
+通常由应用程序直接使用new创建新的对象，为了将对象的创建和使用相分离，采用工厂模式,即应用程序将对象的创建及初始化职责交给工厂对象。
+
+一般情况下,应用程序有自己的工厂对象来创建bean.如果将应用程序自己的工厂对象交给Spring管理,那么Spring管理的就不是普通的bean,而是工厂Bean。
+
+就以工厂方法中的静态方法为例讲解一下：
+
+~~~java
+import java.util.Random;
+
+public class StaticFactoryBean {
+      public static Integer createRandom() {
+           return new Integer(new Random().nextInt());
+       }
+}
+~~~
+
+建一个config.xm配置文件，将其纳入Spring容器来管理,需要通过factory-method指定静态方法名称
+
+~~~xml
+<bean id="random" class="example.chapter3.StaticFactoryBean" factory-method="createRandom" />
+      //createRandom方法必须是static的,才能找到 scope="prototype"
+~~~
+
+测试:
+
+~~~java
+public static void main(String[] args) {
+      //调用getBean()时,返回随机数.如果没有指定factory-method,会返回StaticFactoryBean的实例,即返回工厂Bean的实例       XmlBeanFactory factory = new XmlBeanFactory(new ClassPathResource("config.xml"));       System.out.println("我是IT学习者创建的实例:"+factory.getBean("random").toString());
+}
+~~~
+
+### 第三种：单例模式（Singleton）
+
+保证一个类仅有一个实例，并提供一个访问它的全局访问点。 
+spring中的单例模式完成了后半句话，即提供了全局的访问点BeanFactory。但没有从构造器级别去控制单例，这是因为spring管理的是是任意的java对象。 
+核心提示点：Spring下默认的bean均为singleton，可以通过singleton=“true|false” 或者 scope=“？”来指定
+
+### 第四种：适配器（Adapter）
+
+在Spring的Aop中，使用的Advice（通知）来增强被代理类的功能。Spring实现这一AOP功能的原理就使用代理模式（1、JDK动态代理。2、CGLib字节码生成技术代理。）对类进行方法级别的切面增强，即，生成被代理类的代理类， 并在代理类的方法前，设置拦截器，通过执行拦截器重的内容增强了代理方法的功能，实现的面向切面编程。
+
+**Adapter类接口**：Target
+
+~~~java
+public interface AdvisorAdapter {
+    boolean supportsAdvice(Advice advice);
+    MethodInterceptor getInterceptor(Advisor advisor);
+} 
+~~~
+
+**MethodBeforeAdviceAdapter类**，Adapter
+
+~~~java
+class MethodBeforeAdviceAdapter implements AdvisorAdapter, Serializable {
+      public boolean supportsAdvice(Advice advice) {
+            return (advice instanceof MethodBeforeAdvice);
+      }
+    
+      public MethodInterceptor getInterceptor(Advisor advisor) {
+            MethodBeforeAdvice advice = (MethodBeforeAdvice) advisor.getAdvice();
+      		return new MethodBeforeAdviceInterceptor(advice);
+      }
+}
+~~~
+
+
+
+### 第五种：包装器（Decorator）
+
+在我们的项目中遇到这样一个问题：我们的项目需要连接多个数据库，而且不同的客户在每次访问中根据需要会去访问不同的数据库。我们以往在spring和hibernate框架中总是配置一个数据源，因而sessionFactory的dataSource属性总是指向这个数据源并且恒定不变，所有DAO在使用sessionFactory的时候都是通过这个数据源访问数据库。但是现在，由于项目的需要，我们的DAO在访问sessionFactory的时候都不得不在多个数据源中不断切换，问题就出现了：如何让sessionFactory在执行数据持久化的时候，根据客户的需求能够动态切换不同的数据源？我们能不能在spring的框架下通过少量修改得到解决？是否有什么设计模式可以利用呢？ 
+
+首先想到在spring的applicationContext中配置所有的dataSource。这些dataSource可能是各种不同类型的，比如不同的数据库：Oracle、SQL Server、MySQL等，也可能是不同的数据源：比如apache 提供的org.apache.commons.dbcp.BasicDataSource、spring提供的org.springframework.jndi.JndiObjectFactoryBean等。然后sessionFactory根据客户的每次请求，将dataSource属性设置成不同的数据源，以到达切换数据源的目的。
+spring中用到的包装器模式在类名上有两种表现：一种是类名中含有Wrapper，另一种是类名中含有Decorator。基本上都是动态地给一个对象添加一些额外的职责。 
+
+### 第六种：代理（Proxy）
+
+为其他对象提供一种代理以控制对这个对象的访问。  从结构上来看和Decorator模式类似，但Proxy是控制，更像是一种对功能的限制，而Decorator是增加职责。 
+spring的Proxy模式在aop中有体现，比如JdkDynamicAopProxy和Cglib2AopProxy。 
+
+### 第七种：观察者（Observer）
+
+定义对象间的一种一对多的依赖关系，当一个对象的状态发生改变时，所有依赖于它的对象都得到通知并被自动更新。
+spring中Observer模式常用的地方是listener的实现。如ApplicationListener。 
+
+### 第八种：策略（Strategy）
+
+定义一系列的算法，把它们一个个封装起来，并且使它们可相互替换。本模式使得算法可独立于使用它的客户而变化。 
+spring中在实例化对象的时候用到Strategy模式
+在SimpleInstantiationStrategy中有如下代码说明了策略模式的使用情况： 
+
+![img](E:\个人文件\博客\Java面试题目库题解.assets\4a3dfd16-5d4f-3c32-ae11-d7f5d774c2dd.jpg)
+
+### 第九种：模板方法（Template Method）
+
+定义一个操作中的算法的骨架，而将一些步骤延迟到子类中。Template Method使得子类可以不改变一个算法的结构即可重定义该算法的某些特定步骤。
+Template Method模式一般是需要继承的。这里想要探讨另一种对Template Method的理解。spring中的JdbcTemplate，在用这个类时并不想去继承这个类，因为这个类的方法太多，但是我们还是想用到JdbcTemplate已有的稳定的、公用的数据库连接，那么我们怎么办呢？我们可以把变化的东西抽出来作为一个参数传入JdbcTemplate的方法中。但是变化的东西是一段代码，而且这段代码会用到JdbcTemplate中的变量。怎么办？那我们就用回调对象吧。在这个回调对象中定义一个操纵JdbcTemplate中变量的方法，我们去实现这个方法，就把变化的东西集中到这里了。然后我们再传入这个回调对象到JdbcTemplate，从而完成了调用。这可能是Template Method不需要继承的另一种实现方式吧。 
+
+以下是一个具体的例子： 
+JdbcTemplate中的execute方法 
+
+![img](E:\个人文件\博客\Java面试题目库题解.assets\a1266e58-6822-3178-b0d2-2d3825945099.jpg)
+
+JdbcTemplate执行execute方法 
+
+![点击查看原始大小图片](E:\个人文件\博客\Java面试题目库题解.assets\17993bf3-35de-38cd-abb7-86d6a98ba127.jpg)
+
+
+
+
+
+
+
+
+
+
+
+
 
 为什么要用spring,不用spring的话要怎么办
 
@@ -3021,7 +3721,69 @@ Spring怎么注入一个私有成员变量？（反射，设置可见性true）
 
 除了@ResponseBody，controller层如何标准返回给前端所要的数据类型？你会怎么实现？
 
-Spring MVC的原理和流程
+
+
+
+
+
+
+## Spring MVC的原理和流程
+
+https://www.jianshu.com/p/8a20c547e245（《SpringMVC执行流程及工作原理》）
+
+### SpringMVC执行流程:
+
+1.用户发送请求至前端控制器DispatcherServlet
+
+2.DispatcherServlet收到请求调用处理器映射器HandlerMapping。
+
+3.处理器映射器根据请求url找到具体的处理器，生成处理器执行链HandlerExecutionChain(包括处理器对象和处理器拦截器)一并返回给DispatcherServlet。
+
+4.DispatcherServlet根据处理器Handler获取处理器适配器HandlerAdapter执行HandlerAdapter处理一系列的操作，如：参数封装，数据格式转换，数据验证等操作
+
+5.执行处理器Handler(Controller，也叫页面控制器)。
+
+6.Handler执行完成返回ModelAndView
+
+7.HandlerAdapter将Handler执行结果ModelAndView返回到DispatcherServlet
+
+8.DispatcherServlet将ModelAndView传给ViewReslover视图解析器
+
+9.ViewReslover解析后返回具体View
+
+10.DispatcherServlet对View进行渲染视图（即将模型数据model填充至视图中）。
+
+11.DispatcherServlet响应用户。
+
+### 组件说明：
+
+1.DispatcherServlet：前端控制器。用户请求到达前端控制器，它就相当于mvc模式中的c，dispatcherServlet是整个流程控制的中心，由它调用其它组件处理用户的请求，dispatcherServlet的存在降低了组件之间的耦合性,系统扩展性提高。由框架实现
+
+2.HandlerMapping：处理器映射器。HandlerMapping负责根据用户请求的url找到Handler即处理器，springmvc提供了不同的映射器实现不同的映射方式，根据一定的规则去查找,例如：xml配置方式，实现接口方式，注解方式等。由框架实现
+
+3.Handler：处理器。Handler 是继DispatcherServlet前端控制器的后端控制器，在DispatcherServlet的控制下Handler对具体的用户请求进行处理。由于Handler涉及到具体的用户业务请求，所以一般情况需要程序员根据业务需求开发Handler。
+
+4.HandlAdapter：处理器适配器。通过HandlerAdapter对处理器进行执行，这是适配器模式的应用，通过扩展适配器可以对更多类型的处理器进行执行。由框架实现。
+
+5.ModelAndView是springmvc的封装对象，将model和view封装在一起。
+
+6.ViewResolver：视图解析器。ViewResolver负责将处理结果生成View视图，ViewResolver首先根据逻辑视图名解析成物理视图名即具体的页面地址，再生成View视图对象，最后对View进行渲染将处理结果通过页面展示给用户。
+
+7.View:是springmvc的封装对象，是一个接口, springmvc框架提供了很多的View视图类型，包括：jspview，pdfview,jstlView、freemarkerView、pdfView等。一般情况下需要通过页面标签或页面模版技术将模型数据通过页面展示给用户，需要由程序员根据业务需求开发具体的页面。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 SpringMVC
 
@@ -3124,10 +3886,94 @@ redis的热点key问题
 
 redis的更新策略（先操作数据库还是先操作缓存）
 
-Redis
+为什么选择redis，有什么好处，基于内存，抗压     
 
-- ​      为什么选择redis，有什么好处，基于内存，抗压      
-- ​      redis集群怎么进行数据分配，hash槽      
+
+
+
+
+
+
+##  redis集群怎么进行数据分配，hash槽
+
+https://www.jianshu.com/p/6ad87a1f070e（《redis 一致性哈希和哈希槽》）
+
+### 1、集群分片模式
+
+如果 redis 只用复制功能做主从，那么当数据量巨大的情况下，单机情况下可能已经承受不下一份数据，更不用说是主从都要各自保存一份完整的数据。在这种情况下，数据分片是一个非常好的解决办法。
+
+redis 的 custer 正是用于解决该问题。它主要提供两个功能：
+
+1、自动对数据分片，落到各个节点上
+
+2、即使集群部分节点失效或者连接不上，依然可以继续处理命令
+
+对于第二点，它的功能有点类似于 sentienl 的故障转移，在这里不细说。下面详细了解下 redis 的槽位分片原理，在此之前，先了解下分布式简单哈希算法和一致性哈希算法，以帮助理解槽位的作用。
+
+### 2、简单哈希算法
+
+假设有三台机，数据落在哪台机的算法为：
+
+c = Hash(key) % 3
+
+例如 key A 的哈希值为4，4 % 3 = 1，则落在第二台机。Key ABC 哈希值为11，11 % 3 = 2，则落在第三台机上。
+
+利用这样的算法，假设现在数据量太大了，需要增加一台机器。A 原本落在第二台上，现在根据算法4 % 4 = 0，落到了第一台机器上了，但是第一台机器上根本没有 A 的值。这样的算法会导致增加机器或减少机器的时候，引起大量的缓存穿透，造成雪崩。
+
+### 3、一致性哈希算法
+
+在1997年，麻省理工学院的 Karger 等人提出了一致性哈希算法，为的就是解决分布式缓存的问题。
+
+在一致性哈希算法中，整个哈希空间是一个虚拟圆环。
+
+假设有四个节点 Node A、B、C、D，经过 ip 地址的哈希计算，它们的位置如下：
+
+![img](E:\个人文件\博客\Java面试题目库题解.assets\4337694-f51fb5c31b604e4f.webp)
+
+有4个存储对象 Object A、B、C、D，经过对 Key 的哈希计算后，它们的位置如下：
+
+![img](E:\个人文件\博客\Java面试题目库题解.assets\4337694-52e11e3547d9b5a5.webp)
+
+对于各个 Object，它所真正的存储位置是按顺时针找到的第一个存储节点。例如 Object A 顺时针找到的第一个节点是 Node A，所以 Node A 负责存储 Object A，Object B 存储在 Node B。
+
+一致性哈希算法大概如此，那么它的容错性和扩展性如何呢？
+
+假设 Node C 节点挂掉了，Object C 的存储丢失，那么它顺时针找到的最新节点是 Node D。也就是说 Node C 挂掉了，受影响仅仅包括 Node B 到 Node C 区间的数据，并且这些数据会转移到 Node D 进行存储。
+
+![img](E:\个人文件\博客\Java面试题目库题解.assets\4337694-db75beb80816f60f.webp)
+
+同理，假设现在数据量大了，需要增加一台节点 Node X。Node X 的位置在 Node B 到 Node C 直接，那么受到影响的仅仅是 Node B 到 Node X 间的数据，它们要重新落到 Node X 上。
+
+所以一致性哈希算法对于容错性和扩展性有非常好的支持。但一致性哈希算法也有一个严重的问题，就是数据倾斜。
+
+如果在分片的集群中，节点太少，并且分布不均，一致性哈希算法就会出现部分节点数据太多，部分节点数据太少。也就是说无法控制节点存储数据的分配。如下图，大部分数据都在 A 上了，B 的数据比较少。
+
+### 4、哈希槽
+
+redis 集群（cluster）并没有选用上面一致性哈希，而是采用了哈希槽（slot）的这种概念。主要的原因就是上面所说的，一致性哈希算法对于数据分布、节点位置的控制并不是很友好。
+
+首先哈希槽其实是两个概念，第一个是哈希算法。redis cluster 的 hash 算法不是简单的 hash()，而是 crc16 算法，一种校验算法。另外一个就是槽位的概念，空间分配的规则。其实哈希槽的本质和一致性哈希算法非常相似，不同点就是对于哈希空间的定义。一致性哈希的空间是一个圆环，节点分布是基于圆环的，无法很好的控制数据分布。而 redis cluster 的槽位空间是自定义分配的，类似于 windows 盘分区的概念。这种分区是可以自定义大小，自定义位置的。
+
+redis cluster 包含了16384个哈希槽，每个 key 通过计算后都会落在具体一个槽位上，而这个槽位是属于哪个存储节点的，则由用户自己定义分配。例如机器硬盘小的，可以分配少一点槽位，硬盘大的可以分配多一点。如果节点硬盘都差不多则可以平均分配。所以哈希槽这种概念很好地解决了一致性哈希的弊端。
+
+另外在容错性和扩展性上，表象与一致性哈希一样，都是对受影响的数据进行转移。而哈希槽本质上是对槽位的转移，把故障节点负责的槽位转移到其他正常的节点上。扩展节点也是一样，把其他节点上的槽位转移到新的节点上。
+
+但一定要注意的是，对于槽位的转移和分派，redis 集群是不会自动进行的，而是需要人工配置的。所以 redis 集群的高可用是依赖于节点的主从复制与主从间的自动故障转移。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 - ​      redis的主从复制是怎么实现的      
 - ​      redis的数据结构 最常问 hash是什么， sorted set怎么实现的      
 - ​      因为项目的原因，问我redis是怎么保证高可用的，主从和集群怎么加在一起      
@@ -4082,7 +4928,139 @@ docker
 
 # 消息队列
 
-消息队列原理介绍（不太会）
+## 消息队列原理介绍（不太会）
+
+https://www.cnblogs.com/ifindu-san/p/7832598.html（《消息队列MQ技术的介绍和原理》）
+
+### 消息中间件概述
+
+消息队列技术是分布式应用间交换信息的一种技术。消息队列可驻留在内存或磁盘上,队列存储消息直到它们被应用程序读走。通过消息队列，应用程序可独立地执行--它们不需要知道彼此的位置、或在继续执行前不需要等待接收程序接收此消息。
+
+在分布式计算环境中，为了集成分布式应用，开发者需要对异构网络环境下的分布式应用提供有效的通信手段。为了管理需要共享的信息，对应用提供公共的信息交换机制是重要的。
+
+设计分布式应用的方法主要有：
+
+远程过程调用(PRC)--分布式计算环境(DCE)的基础标准成分之一；
+对象事务监控(OTM)--基于CORBA的面向对象工业标准与事务处理(TP)监控技术的组合；
+消息队列(MessageQueue)--构造分布式应用的松耦合方法。
+
+#### *(a)* 分布计算环境/远程过程调用 (DCE/RPC)
+
+RPC是DCE的成分，是一个由开放软件基金会(OSF)发布的应用集成的软件标准。RPC模仿一个程序用函数引用来引用另一程序的传统程序设计方法，此引用是过程调用的形式，一旦被调用，程序的控制则转向被调用程序。
+
+在RPC实现时，被调用过程可在本地或远地的另一系统中驻留并在执行。当被调用程序完成处理输入数据，结果放在过程调用的返回变量中返回到调用程序。RPC完成后程序控制则立即返回到调用程序。因此RPC模仿子程序的调用/返回结构，它仅提供了Client(调用程序)和Server(被调用过程)间的同步数据交换。
+
+#### *(b)* 对象事务监控 (OTM)
+
+基于CORBA的面向对象工业标准与事务处理(TP)监控技术的组合，在CORBA规范中定义了：使用面向对象技术和方法的体系结构；公共的Client/Server程序设计接口；多平台间传输和翻译数据的指导方针；开发分布式应用接口的语言(IDL)等，并为构造分布的Client/Server应用提供了广泛及一致的模式。
+
+#### *(c)* 消息队列 (Message Queue)
+
+消息队列为构造以同步或异步方式实现的分布式应用提供了松耦合方法。消息队列的API调用被嵌入到新的或现存的应用中，通过消息发送到内存或基于磁盘的队列或从它读出而提供信息交换。消息队列可用在应用中以执行多种功能，比如要求服务、交换信息或异步处理等。
+
+中间件是一种独立的系统软件或服务程序，分布式应用系统借助这种软件在不同的技术之间共享资源，管理计算资源和网络通讯。它在计算机系统中是一个关键软件，它能实现应用的互连和互操作性，能保证系统的安全、可靠、高效的运行。中间件位于用户应用和操作系统及网络软件之间，它为应用提供了公用的通信手段，并且独立于网络和操作系统。中间件为开发者提供了公用于所有环境的应用程序接口，当应用程序中嵌入其函数调用，它便可利用其运行的特定操作系统和网络环境的功能，为应用执行通信功能。
+
+如果没有消息中间件完成信息交换，应用开发者为了传输数据，必须要学会如何用网络和操作系统软件的功能，编写相应的应用程序来发送和接收信息，且交换信息没有标准方法，每个应用必须进行特定的编程从而和多平台、不同环境下的一个或多个应用通信。例如，为了实现网络上不同主机系统间的通信，将要求具备在网络上如何交换信息的知识（比如用TCP/IP的socket程序设计）；为了实现同一主机内不同进程之间的通讯，将要求具备操作系统的消息队列或命名管道(Pipes)等知识。
+
+目前中间件的种类很多，如交易管理中间件(如IBM的CICS)、面向Java应用的Web应用服务器中间件(如IBM的WebSphere Application Server)等，而消息传输中间件(MOM)是其中的一种。它简化了应用之间数据的传输，屏蔽底层异构操作系统和网络平台，提供一致的通讯标准和应用开发，确保分布式计算网络环境下可靠的、跨平台的信息传输和数据交换。它基于消息队列的存储-转发机制，并提供特有的异步传输机制，能够基于消息传输和异步事务处理实现应用整合与数据交换。
+
+IBM 消息中间件MQ以其独特的安全机制、简便快速的编程风格、卓越不凡的稳定性、可扩展性和跨平台性，以及强大的事务处理能力和消息通讯能力，成为业界市场占有率最高的消息中间件产品。
+
+MQ具有强大的跨平台性，它支持的平台数多达35种。它支持各种主流Unix操作系统平台,如：HP-UX、AIX、SUN Solaris、Digital UNIX、Open VMX、SUNOS、NCR UNIX；支持各种主机平台，如：OS/390、MVS/ESA、VSE/ESA；同样支持Windows NT服务器。在PC平台上支持Windows9X/Windows NT/Windows 2000和UNIX (UnixWare、Solaris)以及主要的Linux版本(Redhat、TurboLinux等)。此外，MQ还支持其他各种操作系统平台，如：OS/2、AS/400、Sequent DYNIX、SCO OpenServer、SCO UnixWare、Tandem等。
+
+ 
+
+### MQ的基本概念：
+
+#### 1) 队列管理器
+
+队列管理器是MQ系统中最上层的一个概念，由它为我们提供基于队列的消息服务。
+
+#### 2) 消息
+
+在MQ中，我们把应用程序交由MQ传输的数据定义为消息，我们可以定义消息的内容并对消息进行广义的理解，比如：用户的各种类型的数据文件，某个应用向其它应用发出的处理请求等都可以作为消息。消息有两部分组成：
+
+**消息描述符**(Message Discription或Message Header)，描述消息的特征，如：消息的优先级、生命周期、消息Id等；
+
+**消息体**(Message Body)，即用户数据部分。在MQ中，消息分为两种类型，非永久性(non-persistent)消息和永久性(persistent)消息，非永久性消息是存储在内存中的，它是为了提高性能而设计的，当系统掉电或MQ队列管理器重新启动时，将不可恢复。当用户对消息的可靠性要求不高，而侧重系统的性能表现时，可以采用该种类型的消息，如：当发布股票信息时，由于股票信息是不断更新的，我们可能每若干秒就会发布一次，新的消息会不断覆盖旧的消息。永久性消息是存储在硬盘上，并且纪录数据日志的，它具有高可靠性，在网络和系统发生故障等情况下都能确保消息不丢、不重。
+
+此外，在MQ中，还有逻辑消息和物理消息的概念。利用逻辑消息和物理消息，我们可以将大消息进行分段处理，也可以将若干个本身完整的消息在应用逻辑上归为一组进行处理。
+
+ 
+
+#### 3) 队列
+
+队列是消息的安全存放地，队列存储消息直到它被应用程序处理。
+
+*消息队列以下述方式工作：*
+
+a) 程序A形成对消息队列系统的调用，此调用告知消息队列系统，消息准备好了投向程序B；
+
+b) 消息队列系统发送此消息到程序B驻留处的系统，并将它放到程序B的队列中；
+
+c) 适当时间后，程序B从它的队列中读此消息，并处理此信息。
+
+ 
+
+由于采用了先进的程序设计思想以及内部工作机制，MQ能够在各种网络条件下保证消息的可靠传递，可以克服网络线路质量差或不稳定的现状，在传输过程中，如果通信线路出现故障或远端的主机发生故障，本地的应用程序都不会受到影响，可以继续发送数据，而无需等待网络故障恢复或远端主机正常后再重新运行。
+
+在MQ中，队列分为很多种类型，其中包括：本地队列、远程队列、模板队列、动态队列、别名队列等。
+
+**本地队列**又分为普通本地队列和传输队列，**普通本地队列**是应用程序通过API对其进行读写操作的队列；**传输队列**可以理解为存储-转发队列，比如：我们将某个消息交给MQ系统发送到远程主机，而此时网络发生故障，MQ将把消息放在传输队列中暂存，当网络恢复时，再发往远端目的地。
+
+**远程队列**是目的队列在本地的定义，它类似一个地址指针，指向远程主机上的某个目的队列，它仅仅是个定义，不真正占用磁盘存储空间。
+
+**模板队列**和**动态队列**是MQ的一个特色，它的一个典型用途是用作系统的可扩展性考虑。我们可以创建一个模板队列，当今后需要新增队列时，每打开一个模板队列，MQ便会自动生成一个动态队列，我们还可以指定该动态队列为临时队列或者是永久队列，若为临时队列我们可以在关闭它的同时将它删除，相反，若为永久队列，我们可以将它永久保留，为我所用。
+
+#### 4) 通道
+
+通道是MQ系统中队列管理器之间传递消息的管道，它是建立在物理的网络连接之上的一个逻辑概念，也是MQ产品的精华。
+
+在MQ中，主要有三大类通道类型，即消息通道，MQI通道和Cluster通道。**消息通道**是用于在MQ的服务器和服务器之间传输消息的，需要强调指出的是，该通道是单向的，它又有发送(sender), 接收(receive), 请求者(requestor), 服务者(server)等不同类型，供用户在不同情况下使用。**MQI通道**是MQ Client和MQI通道是MQ Client和MQ Server之间通讯和传输消息用的，与消息通道不同，它的传输是双向的。**群集(Cluster)通道**是位于同一个MQ 群集内部的队列管理器之间通讯使用的。
+
+### MQ的工作原理(图见附件)
+
+
+首先来看本地通讯的情况，应用程序A和应用程序B运行于同一系统A，它们之间可以借助消息队列技术进行彼此的通讯：应用程序A向队列1发送一条信息，而当应用程序B需要时就可以得到该信息。
+
+其次是远程通讯的情况，如果信息传输的目标改为在系统B上的应用程序C，这种变化不会对应用程序A产生影响，应用程序A向队列2发送一条信息，系统A的MQ发现Q2所指向的目的队列实际上位于系统B，它将信息放到本地的一个特殊队列－传输队列(Transmission Queue)。我们建立一条从系统A到系统B的消息通道，消息通道代理将从传输队列中读取消息，并传递这条信息到系统B，然后等待确认。只有MQ接到系统B成功收到信息的确认之后，它才从传输队列中真正将该信息删除。如果通讯线路不通，或系统B不在运行，信息会留在传输队列中，直到被成功地传送到目的地。这是MQ最基本而最重要的技术--确保信息传输，并且是一次且仅一次(once-and-only-once)的传递。
+
+MQ提供了用于应用集成的松耦合的连接方法，因为共享信息的应用不需要知道彼此物理位置（网络地址）；不需要知道彼此间怎样建立通信；不需要同时处于运行状态；不需要在同样的操作系统或网络环境下运行。
+
+### MQ的基本配置举例
+
+在上图中，要实现网络上两台主机上的通讯，若采用点对点的通讯方式，我们至少要建立如下MQ的对象：
+在发送方A:
+1） 建立队列管理器QMA: crtmqm -q QMA
+2） 定义本地传输队列: define qlocal (QMB) usage (xmitq) defpsist(yes)
+3） 创建远程队列: define qremote (QR.TOB) rname (LQB) rqmname (QMB) xmitq (QMB)
+4） 定义发送通道: define channel (A.TO.B) chltype (sdr) conname ('IP of B') xmitq (QMB) + trptype (tcp)
+
+在接收方B：
+1） 建立队列管理器QMB: crtmqm -q QMB
+2） 定义本地队列QLB: define qlocal (LQB)
+3） 创建接收通道: define channel (A.TO.B) chltype (rcvr) trptype (tcp)
+经过上述配置，我们就可以实现从主机A到B的单向通讯，若要实现二者之间的双向通讯，可参考此例创建所需要的MQ对象。
+
+### MQ的通讯模式
+
+1) 点对点通讯：点对点方式是最为传统和常见的通讯方式，它支持一对一、一对多、多对多、多对一等多种配置方式，支持树状、网状等多种拓扑结构。
+
+2) 多点广播：MQ适用于不同类型的应用。其中重要的，也是正在发展中的是"多点广播"应用，即能够将消息发送到多个目标站点(Destination List)。可以使用一条MQ指令将单一消息发送到多个目标站点，并确保为每一站点可靠地提供信息。MQ不仅提供了多点广播的功能，而且还拥有智能消息分发功能，在将一条消息发送到同一系统上的多个用户时，MQ将消息的一个复制版本和该系统上接收者的名单发送到目标MQ系统。目标MQ系统在本地复制这些消息，并将它们发送到名单上的队列，从而尽可能减少网络的传输量。
+
+3) 发布/订阅(Publish/Subscribe)模式：发布/订阅功能使消息的分发可以突破目的队列地理指向的限制，使消息按照特定的主题甚至内容进行分发，用户或应用程序可以根据主题或内容接收到所需要的消息。发布/订阅功能使得发送者和接收者之间的耦合关系变得更为松散，发送者不必关心接收者的目的地址，而接收者也不必关心消息的发送地址，而只是根据消息的主题进行消息的收发。在MQ家族产品中，MQ Event Broker是专门用于使用发布/订阅技术进行数据通讯的产品，它支持基于队列和直接基于TCP/IP两种方式的发布和订阅。
+
+4) 群集(Cluster)：为了简化点对点通讯模式中的系统配置，MQ提供Cluster(群集)的解决方案。群集类似于一个域(Domain)，群集内部的队列管理器之间通讯时，不需要两两之间建立消息通道，而是采用群集(Cluster)通道与其它成员通讯，从而大大简化了系统配置。此外，群集中的队列管理器之间能够自动进行负载均衡，当某一队列管理器出现故障时，其它队列管理器可以接管它的工作，从而大大提高系统的高可靠性。
+
+
+
+
+
+
+
+
+
+
 
 死信队列
 
@@ -4104,7 +5082,57 @@ Kafka 架构原理，消费异常处理，重复消费处理，Kafak 可靠性�
 
 kafka怎么保证消息不丢失
 
-mq怎么用的，有什么好处，还了解过哪些mq（扯了RocketMQ和Kafka）？
+
+
+## mq怎么用的，有什么好处，还了解过哪些mq（扯了RocketMQ和Kafka）？
+
+https://blog.csdn.net/songfeihu0810232/article/details/78648706 （《Java常用消息队列原理介绍及性能对比》）
+
+### 为什么使用消息队列
+
+#### 解耦
+
+在项目启动之初来预测将来项目会碰到什么需求，是极其困难的。消息系统在处理过程中间插入了一个隐含的、基于数据的接口层，两边的处理过程都要实现这一接口。这允许你独立的扩展或修改两边的处理过程，只要确保它们遵守同样的接口约束。
+
+#### 冗余
+
+有些情况下，处理数据的过程会失败。除非数据被持久化，否则将造成丢失。消息队列把数据进行持久化直到它们已经被完全处理，通过这一方式规避了数据丢失风险。许多消息队列所采用的”插入-获取-删除”范式中，在把一个消息从队列中删除之前，需要你的处理系统明确的指出该消息已经被处理完毕，从而确保你的数据被安全的保存直到你使用完毕。
+
+#### 扩展性
+
+因为消息队列解耦了你的处理过程，所以增大消息入队和处理的频率是很容易的，只要另外增加处理过程即可。不需要改变代码、不需要调节参数。扩展就像调大电力按钮一样简单。
+
+#### 灵活性 & 峰值处理能力
+
+在访问量剧增的情况下，应用仍然需要继续发挥作用，但是这样的突发流量并不常见；如果为以能处理这类峰值访问为标准来投入资源随时待命无疑是巨大的浪费。使用消息队列能够使关键组件顶住突发的访问压力，而不会因为突发的超负荷的请求而完全崩溃。
+
+#### 可恢复性
+
+系统的一部分组件失效时，不会影响到整个系统。消息队列降低了进程间的耦合度，所以即使一个处理消息的进程挂掉，加入队列中的消息仍然可以在系统恢复后被处理。
+
+#### 顺序保证
+
+在大多使用场景下，数据处理的顺序都很重要。大部分消息队列本来就是排序的，并且能保证数据会按照特定的顺序来处理。Kafka保证一个Partition内的消息的有序性。
+
+#### 缓冲
+
+在任何重要的系统中，都会有需要不同的处理时间的元素。例如，加载一张图片比应用过滤器花费更少的时间。消息队列通过一个缓冲层来帮助任务最高效率的执行———写入队列的处理会尽可能的快速。该缓冲有助于控制和优化数据流经过系统的速度。
+
+#### 异步通信
+
+很多时候，用户不想也不需要立即处理消息。消息队列提供了异步处理机制，允许用户把一个消息放入队列，但并不立即处理它。想向队列中放入多少消息就放多少，然后在需要的时候再去处理它们。
+
+### 消息队列（MQ）常用的使用场景
+
+1. 进程间通讯和系统间的消息通知，比如在分布式系统中。
+2. 解耦，比如像我们公司有许多开发团队，每个团队负责业务的不同模块，各个开发团队可以使用MQ来通信。
+3. 在一些高并发场景下，使用MQ的异步特性。
+
+### 消息队列性能对比及选型
+
+![img](E:\个人文件\博客\Java面试题目库题解.assets\20171127202420239.png)
+
+
 
 # 登录
 
