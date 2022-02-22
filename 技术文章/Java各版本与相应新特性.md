@@ -395,6 +395,62 @@ TreeMap 类现在提供了 `putIfAbsent`、`computeIfAbsent`、`computeIfPresent
 
 
 
+## JDK 14
+
+### 会计货币格式支持
+
+**【核心库】**
+
+对于金额在某些语言环境中以括号格式格式化的具有会计风格的货币格式实例，可以通过调用带有 “u-cf-account” Unicode 语言环境扩展的 `NumberFormat.getCurrencyInstance(Locale)` 来获得。例如 `Locale.US`，它将格式化为 “`($3.27)`” 而不是 “`-$3.27`”。
+
+### JEP 359 记录（预览版）
+
+**【核心库 / java.lang】**
+
+在 JDK 14 中，Records (JEP 359) 预览功能添加了一个新类`java.lang.Record`。该 `java.lang` 包是按需隐式导入的，即 `import java.lang.*`。如果现有源文件中的代码按需导入某个其他包，例如，`import com.myapp.*;`，并且该包声明了一个名为 `Record` 的类型，则现有源文件中引用该类型的代码将不会在不更改的情况下编译。要编译代码，请使用单一类型导入来导入其他包的 `Record` 类型，例如 `import com.myapp.Record;`。
+
+### 明确 ReadableByteChannel.read() 规范及相关方法
+
+**【核心库 / java.nio】**
+
+`DatagramChannel.receive()`、`FileChannel.read(ByteBuffer,long)`、`ReadableByteChannel.read()` 和 `ScatteringByteChannel.read()` 方法的规范（specification）已在此版本中更新，以指定：如果（任何）缓冲区参数是只读的，则抛出一个 `IllegalArgumentException` 。此更改仅调整规范以匹配现有的长期行为。
+
+### Windows 上的 JEP 365 ZGC
+
+**【HotSpot / gc】**
+
+Z 垃圾收集器 (ZGC) 现在可作为 Windows 上的实验性功能使用。要启用它，请使用 JVM 标志 `-XX:+UnlockExperimentalVMOptions -XX:+UseZGC`。
+
+### macOS 上的 JEP 364 ZGC
+
+**【HotSpot / gc】**
+
+Z 垃圾收集器 (ZGC) 现在可作为 macOS 上的实验性功能使用。要启用它，请使用 JVM 标志 `-XX:+UnlockExperimentalVMOptions -XX:+UseZGC`。
+
+### Parallel GC 改进
+
+**【HotSpot / gc】**
+
+Parallel GC 采用了与其他收集器相同的任务管理机制来调度并行任务。这可能会导致显着的性能改进。由于此更改，以下产品标志已过时：`-XX:BindGCTaskThreadsToCPUs`、`-XX:UseGCTaskAffinity` 和 `-XX:GCTaskTimeStampEntries`。
+
+### G1 的 JEP 345 NUMA 感知内存分配
+
+**【HotSpot / gc】**
+
+G1 垃圾收集器现在尝试跨垃圾收集在年轻代中的同一 NUMA 节点上分配和保留对象。这类似于 Parallel GC NUMA 感知。
+
+G1 尝试使用严格的交错将 Humongous 和 Old 区域均匀分布在所有可用的 NUMA 节点上。从年轻代复制到老年代的对象的放置是随机的。
+
+这些新的 NUMA-Aware 内存分配启发式是通过使用 `-XX:+UseNUMA` 命令行选项自动启用的。
+
+### JEP 349 JFR 事件流
+
+**【HotSpot / jfr】**
+
+JDK Flight Recorder (JFR) 现在支持对 Java 应用程序的持续监控，方法是允许使用位于 jdk.jfr.consumer 包中的新 API 动态使用事件。使用 JFR 时始终启用该功能，这意味着直到最后一秒的记录数据可用于进程内和进程外消耗。
+
+
+
 # 各个版本删除的功能和选项
 
 
@@ -471,6 +527,8 @@ Java Ahead-of-Time 编译实验工具 `jaotc` 已被删除。使用 JEP295 定�
 
 SunEC 提供程序不再支持一些已过时或未使用现代公式和技术实现的椭圆曲线。
 
+
+
 ## JDK 15
 
 ### 删除最终弃用的 Solaris 特定 SO_FLOW_SLA 套接字选项
@@ -526,6 +584,46 @@ VM 选项 `UseAdaptiveGCBoundary` 已过时。使用此选项将产生过时选�
 **【安全库 / javax.net.ssl】**
 
 旧的 SunJSSE 提供程序名称 “com.sun.net.ssl.internal.ssl.Provider” 已被删除，不应再使用。应改为使用 “SunJSSE” 名称。例如， `SSLContext.getInstance("TLS", "SunJSSE")`。
+
+
+
+## JDK 14
+
+### 删除 sun.nio.cs.map 系统属性
+
+**【核心库 / java.nio.charsets】**
+
+JDK 1.4.1 中添加的系统属性 `sun.nio.cs.map` 已被删除。它是为应用程序提供的，以帮助从 `Shift_JIS` 相当于 MS Windows 代码页 932 的旧定义迁移到 IANA 定义的定义。使用映射属性的应用程序需要根据需要指定正确的字符集名称。
+
+### 去掉 netscape.javascript.JSObjectgetWindow 方法
+
+**【部署】**
+
+已删除过时的方法 `netscape.javascript.JSObject::getWindow`。此方法在 JDK 9 中已弃用。从 JDK 11 开始，不再有使用此方法的有用方法；它总是返回 `null`。
+
+### JEP 363 删除并发标记和清除 (CMS) 垃圾收集器
+
+**【HotSpot / gc】**
+
+CMS 垃圾收集器已被删除。`-XX:UseConcMarkSweepGC` 和别名 `-Xconcgc`，`-Xnoconcgc` 以及所有 CMS 特定选项（太多无法列出）都已过时。
+
+### 删除了已弃用的 java.security.acl API
+
+**【安全库 / java.security】**
+
+已弃用的 `java.security.acl` API 已被删除。这包括该包中的以下类：`Acl`、`AclEntry`、`AclNotFoundException`、`Group`、`LastOwnerException`、`NotOwnerException`、`Owner` 和 `Permission`。
+
+### 删除默认 keytool -keyalg 值
+
+**【安全库 / java.security】**
+
+`keytool -genkeypair` 和 `keytool -genseckey` 命令的默认密钥算法已被删除。现在，您必须通过在使用 `-genkeypair` 或者 `-genseckey` 命令时包含 `-keyalg` 选项来指定密钥算法。如果未指定 `-keyalg` 选项，则 `keytool` 将终止并显示错误消息：“必须指定 -keyalg 选项（The -keyalg option must be specified）”。
+
+### JEP 367 删除 Pack200 工具和 API
+
+**【工具 / jar】**
+
+JDK 5.0 中添加的 `pack200` 和 `unpack200` 工具已被删除。该类 `java.util.jar.Pack200` 和接口 `java.util.jar.Pack200.Packer` 和 `java.util.jar.Pack200.Unpacker` 也已被删除。这些工具和 API 在 Java SE 11 中已被弃用，以便在未来的版本中删除它们。此外，在 `jar`工具中，`jar c` 的 `n` 子选项已被删除。
 
 
 
@@ -636,6 +734,56 @@ SunEC 加密提供商不再宣传未使用现代公式和技术实现的曲线�
 **【安全库 / jdk.security】**
 
 `com.sun.jarsigner` 包中的 `ContentSigner` 和 `ContentSignerParameters` 类支持替代签名者，并且已和 `forRemoval=true` 一起被弃用。当 `-altsigner` 或者 `-altsignerpath` 选项被指定时，`jarsigner` 工具会发出警告，指出这些选项已弃用并将被删除。
+
+
+
+## JDK 14
+
+### 弃用线程挂起/恢复以删除
+
+**【核心库 / java.lang】**
+
+以下与线程暂停相关的方法在此版本 `java.lang.Thread` 中 `java.lang.ThreadGroup` 已被最终弃用：
+
+- `Thread.suspend()`
+- `Thread.resume()`
+- `ThreadGroup.suspend()`
+- `ThreadGroup.resume()`
+- `ThreadGroup.allowThreadSuspension(boolean)`
+
+这些方法将在未来的版本中删除。
+
+### 不推荐使用 NSWindowStyleMaskTexturedBackground
+
+**【客户端库 / javax.swing】**
+
+升级用于构建 JDK 的 macOS SDK 后，Swing 属性 `apple.awt.brushMetalLook` 和 `textured` 的行为发生了变化。设置这些属性后，框架的标题仍然可见。建议将该 `apple.awt.transparentTitleBar` 属性设置为 `true` 使框架的标题再次不可见。也可以使用 `apple.awt.fullWindowContent` 属性。
+
+请注意，`Textured window` 支持是通过使用 `NSWindowStyleMask` 的 `NSTexturedBackgroundWindowMask` 值实现的。但是，这在 macOS 10.12 中已被弃用，和在 macOS 10.14 中已被弃用的 `NSWindowStyleMaskTexturedBackground` 一起。
+
+### JEP 366 弃用 ParallelScavenge + SerialOld GC 组合
+
+**【HotSpot / gc】**
+
+ParallelScavenge + SerialOld 垃圾收集器组合已被弃用。任何 `UseParallelOldGC` 用于启用此垃圾收集算法组合的命令行选项的使用都会导致弃用警告。
+
+直接替换是 `-XX:+UseParallelGC` 在命令行上使用 ParallelScavenge + ParallelOld 垃圾收集器。
+
+### 弃用了旧版椭圆曲线以进行删除
+
+**【安全库 / javax.crypto】**
+
+`SunEC` 提供程序支持的以下命名椭圆曲线已被弃用：
+
+brainpoolP256r1，brainpoolP320r1，brainpoolP384r1，brainpoolP512r1，secp112r1，secp112r2，secp128r1，secp128r2，secp160k1，secp160r1，secp160r2，secp192k1，secp192r1，secp224k1，secp224r1，secp256k1，sect113r1，sect113r2，sect131r1，sect131r2，sect163k1，sect163r1，sect163r2，sect193r1，sect193r2， sect233k1，sect233r1，sect239k1，sect283k1，sect283r1，sect409k1，sect409r1，sect571k1，sect571r1，X9.62 c2tnb191v1，X9.62 c2tnb191v2，X9.62 c2tnb191v3，X9.62 c2tnb239v1，X9.62 c2tnb239v2，X9.62 c2tnb239v3，X9。 62 c2tnb359v1, X9.62 c2tnb431r1, X9.62 prime192v2, X9.62 prime192v3, X9.62 prime239v1, X9.62 prime239v2, X9.62 prime239v3
+
+这些曲线的实现将在后续 JDK 版本中删除。其中一小部分可能会被更现代的实现所取代。
+
+### 弃用 OracleUcrypto JCE 提供程序以删除
+
+**【安全库 / javax.crypto】**
+
+OracleUcrypto JCE Provider 及其包含的模块 `jdk.crypto.ucrypto` 已被弃用，并可能在 JDK 的未来版本中被删除。
 
 
 
@@ -922,6 +1070,44 @@ JDK Kerberos 实现现在支持 krb5.conf 文件中的 “canonicalize” 标志
 对 Kerberos MSSFU 扩展 [1] 的支持现在扩展到跨领域环境。
 
 通过利用在 JDK-8215032 的上下文中引入的 Kerberos 跨领域引用增强功能，可以使用 “S4U2Self” 和 “S4U2Proxy” 扩展来模拟位于不同领域的用户和服务主体。
+
+
+
+## JDK 14
+
+### 默认禁用 TLS、CertPath 和签名 JAR 中的弱命名曲线
+
+**【安全库 / java.security】**
+
+默认情况下，通过将弱命名曲线添加到以下 `disabledAlgorithms` 安全属性来禁用它们：`jdk.tls.disabledAlgorithms`、`jdk.certpath.disabledAlgorithms` 和 `jdk.jar.disabledAlgorithms`。下面列出了命名曲线。
+
+有 47 条弱命名曲线被禁用，向每个 `disabledAlgorithms` 属性添加单独的命名曲线将是压倒性的。为了缓解这个问题，`jdk.disabled.namedCurves` 实现了一个新的安全属性 ，它可以列出所有 `disabledAlgorithms` 属性共有的命名曲线。要在属性中使用新属性 `disabledAlgorithms`，请在完整属性名称前加上关键字 `include`。用户仍然可以将单独的命名曲线添加到 `disabledAlgorithms` 与此新属性分开的属性中。属性中不能包含其他 `disabledAlgorithms` 属性。
+
+要恢复命名曲线，请 `include jdk.disabled.namedCurves` 从特定或所有 `disabledAlgorithms` 安全属性中删除。要恢复一条或多条曲线，请从 `jdk.disabled.namedCurves `属性中删除特定的命名曲线。
+
+曲线被禁用通过 `jdk.disabled.namedCurves` 包括以下：secp112r1，secp112r2，secp128r1，secp128r2，secp160k1，secp160r1，secp160r2，secp192k1，secp192r1，secp224k1，secp224r1，secp256k1，sect113r1，sect113r2，sect131r1，sect131r2，sect163k1，sect163r1，sect163r2，sect193r1，sect193r2 ，sect233k1，sect233r1，sect239k1，sect283k1，sect283r1，sect409k1，sect409r1，sect571k1，sect571r1，X9.62 c2tnb191v1，X9.62 c2tnb191v2，X9.62 c2tnb191v3，X9.62 c2tnb239v1，X9.62 c2tnb239v2，X9.62 c2tnb239v3，X9 .62 c2tnb359v1，X9.62 c2tnb431r1，X9.62 prime192v2，X9.62 prime192v3，X9.62 prime239v1，X9.62 prime239v2，X9.62 prime239v3，brainpoolP256r1，brainpoolP320r1，brainpoolP384r1，brainpoolP512r1
+
+保持启用的曲线是：secp256r1、secp384r1、secp521r1、X25519、X448
+
+### Apache Santuario 库更新到版本 2.1.4
+
+**【安全库 / javax.xml.crypto】**
+
+Apache Santuario 库已升级到版本 2.1.4。因此，`com.sun.org.apache.xml.internal.security.parser.pool-size` 引入了新的系统属性。
+
+`DocumentBuilder` 这个新的系统属性设置处理 XML 签名时使用的内部缓存的池大小。该函数等效 `org.apache.xml.security.parser.pool-size` 于 Apache Santuario 中使用的系统属性，并且具有相同的默认值 20。
+
+### 允许默认调用可发现的 javac 插件
+
+**【工具 / javac】**
+
+如果没有在从命令行传递给的选项或 `options` API 调用的参数中显式传递给 `javac` 启动的情况下，javac “插件”现在可以选择默认启动。可以通过以返回 `true` 来实现 `Plugin.isDefault()` 方法以启用此行为。
+
+### SAX ContentHandler 处理 XML 声明的新方法
+
+**【xml / jaxp】**
+
+`SAX ContentHandler` 添加了一个新方法  `declaration` 来接收 XML 声明的通知。通过实现此方法，应用程序可以接收与输入文档中声明的完全相同的版本、编码和独立属性的值。
 
 
 
