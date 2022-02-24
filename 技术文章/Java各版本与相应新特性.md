@@ -38,16 +38,34 @@
 | 9    | 2017.9   | Jigsaw 模块化功能、接口私有方法、Try-With Resources、@SafeVarargs注释、集合工厂方法、Process API改进、流API改进、增强若干工具（JS Shell、JLink、JHSDB等）、整顿了 HotSpot 各个模块各自为战的日志系统、支持HTTP 2客户单API |
 | 10   | 2018.3   | 局部变量的类型推断、应用类数据共享、向G1引入并行Full GC、线程局部管控、统一源仓库、统一垃圾收集器接口、统一即时编译器接口（引入新的Graal即时编译器） |
 | 11   | 2018.9   | ZGC 垃圾收集器、本地变量类型推断、字符串加强、集合加强、Stream 加强、Optional 加强、InputStream 加强、HTTP Client API、一个命令编译运行源代码 |
-| 12   | 2019.3   | Switch表达式、Java微测试套件（JMH）、Shenandoah垃圾收集器、JVM常量API、默认类数据共享归档文件、可终止的G1 Mixed GC、G1及时返回未使用的已分配内存 |
+| 12   | 2019.3   | Switch 表达式（预览）、Java 微测试套件（JMH）、Shenandoah垃圾收集器、JVM常量API、默认类数据共享归档文件、可终止的G1 Mixed GC、G1及时返回未使用的已分配内存 |
 | 13   | 2019.9   | 增强 ZGC 释放未使用内存、Socket API 重构、Switch 表达式扩展（预览功能）、文本块（预览功能） |
-| 14   | 2020.3   | 完全支持改进的 switch 表达式、instanceof 支持模式匹配、record 特性、NullPointerException 精确到行、加入了 Java 打包工具 jpackage 的预览版 |
+| 14   | 2020.3   | 完全支持改进的 switch 表达式、instanceof 支持模式匹配、record 特性、NullPointerException 精确到变量、加入了 Java 打包工具 jpackage 的预览版 |
 | 15   | 2020.9   | ZGC 将从实验功能升级为产品、char 在 CharSequence 中添加了 isEmpty 默认方法、支持 Unicode 13.0、隐藏类、TreeMap 方法的专用实现、增加了为远程JMX配置第三个端口的能力 |
 | 16   | 2021.3   | record 正式使用、jpackage 工具正式使用、instanceof 正式使用  |
 | 17   | 2021.9   | 增强了伪随机数算法、移除 AOT 提前编译和 JIT 即时编译的功能、sealed修饰的类和接口限制其他的类或者接口的扩展和实现、进一步增强了switch语法的模式匹配 |
 
 较早的版本特性参考了《Java 核心技术：卷I 基础知识（原书第11版）》和《深入理解 Java 虚拟机：JVM 高级特性与最佳实践（第3版）》
 
-# JDK 9 ~ 17 各版本变化简单总结
+# JDK 8 ~ 17 各版本变化简单总结
+
+需要注意，OpenJDK 和 Oracle 在具体细节上会有区别，以下列表中斜体为 OpenJDK 文档中提到的变化。
+
+## JDK 8
+
+具体常用的特性可以参考《Java 8 实战》，感觉很详细
+
+| 所属范围 | 新特性                                                       |
+| -------- | ------------------------------------------------------------ |
+| 语言     | **Lambda 表达式**、**方法引用**、**接口默认方法**、**重复注解**、**类型注解（Type Annotation）**、改进的类型推断、方法参数反射 |
+| 核心库   | **java.util.stream 包中的类提供 Stream API**、**java.util.Optional**、**具有键冲突的 HashMap 的性能改进（红黑树）**、Rhino javascript 引擎已被Nashorn Javascript 引擎 取代、<br/>IO 和 NIO （`SelectorProvider` 基于 Solaris 事件端口机制的 Solaris 新实现、减小`<JDK_HOME>/jre/lib/charsets.jar` 文件大小、`java.lang.String(byte[], *)`构造函数和方法 `java.lang.String.getBytes()` 的性能改进）、<br/>并行数组排序、标准编码和解码 Base64、无符号算术支持、<br/>网络（类 `java.net.URLPermission` 已添加、类 `java.net.HttpURLConnection` 中如果安装了安全管理器则调用该请求以打开连接需要权限）、<br/>**并发**（`java.util.concurrent`包新类和接口、 `java.util.concurrent.ConcurrentHashMap` 类新方法以支持基于新添加的流工具和 lambda 表达式的聚合操作、`java.util.concurrent.atomic` 包新类以支持可扩展的可更新变量、`java.util.concurrent.ForkJoinPool` 类新方法以支持公共池、添加类`java.util.concurrent.locks.StampedLock`以提供基于能力的锁，该锁具有三种用于控制读/写访问的模式） |
+| JVM      | 添加了硬件内在函数以使用高级加密标准 (AES)、**删除 PermGen**、Java 编程语言中的默认方法由方法调用的字节码指令支持 |
+| 工具     | `jjs` 命令以调用 Nashorn 引擎、`java` 命令启动 JavaFX 应用程序、`java` 手册页已重新设计、`jdeps` 命令行工具用于分析类文件、Java 管理扩展 (JMX) 提供对诊断命令的远程访问、`jarsigner` 工具用于向时间戳权威 (TSA) 请求签名时间戳的选项、<br/>javac 命令（可用于存储形式参数名称并使反射 API 能够检索形式参数名称的`-parameters`选项、正确实施 Java 语言规范 (JLS) 第 15.21 节中相等运算符的类型规则、支持在运行 `javadoc` 时生成的文件中检查可能导致各种问题的问题的评论内容、提供了根据需要生成本机标头的能力）、<br/>Pack200（对 JSR 292 引入的常量池条目和新字节码的支持、支持由 JSR-292、JSR-308 和 JSR-335 指定的类文件更改）、<br/>JDBC（JDBC-ODBC 桥已被删除、JDBC 4.2 引入了新特性）、<br/>包含 Java DB 10.10、包括 Java Mission Control 5.3 |
+| javadoc  | 支持新的 `DocTree` API、支持新的 Javadoc Access API、现在支持在运行 `javadoc` 时生成的文件中检查可能导致各种问题的问题的评论内容 |
+| 部署     | 对于沙盒小程序和 Java Web Start 应用程序，`URLPermission` 现在用于允许连接回到启动它们的服务器而 `SocketPermission`不再允许、在所有安全级别的主 JAR 文件的 JAR 文件清单中都需要 Permissions 属性 |
+| 国际化   | **Unicode 6.2.0**、采用 Unicode CLDR 数据和 java.locale.providers 系统属性、**新的日历和语言环境 API**、能够将自定义资源包安装为扩展 |
+| 客户端库 | JavaFX（新的 Modena 主题、`SwingNode`类使开发人员能够将 Swing 内容嵌入到 JavaFX 应用程序中、新的 UI 控件、`javafx.print` 包为 JavaFX 打印 API 提供公共类、3D 图形功能现在包括 3D 形状 \ 相机 \ 灯光 \ 子场景 \ 材质 \ 拾取和抗锯齿、`WebView` 提供了新功能和改进、增强的文本支持、对 Hi-DPI 显示器的支持、CSS Styleable* 类成为公共 API、新 ScheduledService 类允许自动重启服务、可用于 ARM 平台） |
+| 安全     | 默认启用客户端 TLS 1.2、`AccessController.doPrivileged` 使代码能够断言其权限的子集、更强大的基于密码的加密算法、JSSE 服务器中的 SSL/TLS 服务器名称指示 (SNI) 扩展支持、支持 AEAD 算法、KeyStore 增强功能、SHA-224 消息摘要、增强对 NSA Suite B 加密的支持、更好地支持高熵随机数生成、`java.security.cert.PKIXRevocationChecker`用于配置 X.509 证书吊销检查、适用于 Windows 的 64 位 PKCS11、Kerberos 5 重放缓存中的新 rcache 类型、支持 Kerberos 5 协议转换和约束委派、默认禁用 Kerberos 5 弱加密类型、GSS-API/Kerberos 5 机制的未绑定 SASL、多个主机名的 SASL 服务、JNI 桥接到 Mac OS X 上的本机 JGSS、在 SunJSSE 提供程序中支持更强的临时 DH 密钥、支持 JSSE 中的服务器端密码套件首选项自定义 |
 
 ## JDK 9
 
@@ -68,14 +86,14 @@
 
 | 所属范围 | 新特性                                                       | 删除                                                         | 弃用                                                         |
 | -------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| 语言     | **局部变量的类型推断 var**                                   |                                                              |                                                              |
-| 核心库   | Optional.orElseThrow()、**不可修改集合 API**                 | Runtime.getLocalizedInputStream 和 getLocalizedOutputStream 方法、RMI 服务器端多路复用协议支持、 |                                                              |
-| JVM      | **G1 的并行 Full GC**                                        | FlatProfiler、过时的 -X 选项                                 |                                                              |
+| 语言     | ***局部变量的类型推断 var***                                 |                                                              |                                                              |
+| 核心库   | Optional.orElseThrow()、**不可修改集合 API**、*基于时间的发布版本控制* | Runtime.getLocalizedInputStream 和 getLocalizedOutputStream 方法、RMI 服务器端多路复用协议支持、 |                                                              |
+| JVM      | **G1 的并行 Full GC**、<br/>***垃圾收集器接口***、*应用程序类-数据共享（CDS）*、*线程本地握手*、*在用户指定的备用内存设备（例如 NV-DIMM）上分配 Java 对象堆*、***实验性基于 Java 的 JIT 编译器 Graal*** | FlatProfiler、过时的 -X 选项                                 |                                                              |
 | 工具     | 增强 for 循环的字节码生成                                    | Native-Header 生成工具 (javah)、Java Launcher 的数据模型选项 -d32 和 -d64 |                                                              |
 | javadoc  | 支持多种样式表、重写不改变规范的方法、@Summary 注解          | 旧的（JDK 6、JDK 7 和 JDK 8 时代）标准 Doclet                |                                                              |
-| 部署     |                                                              | 常见的 DOM API                                               |                                                              |
+| 部署     | *将 JDK 森林整合到一个存储库中*                              | 常见的 DOM API                                               |                                                              |
 | svc      | 禁用 JRE 上次使用跟踪的系统属性、开箱即用 JMX 代理的散列密码 |                                                              | SNMP 监控支持                                                |
-| 国际化   |                                                              |                                                              |                                                              |
+| 国际化   | *额外的 Unicode 语言标签扩展*                                |                                                              |                                                              |
 | 客户端库 |                                                              | 对使用旧 LookAndFeel 的支持、JavaFX 应用程序生命周期的 HostServicesgetWebContext 方法、JavaFX 中的 T2K Rasterizer 和 ICU 布局引擎、JavaFX 中已弃用的 VP6/FXM/FLV 代码 |                                                              |
 | 安全     | 根证书、TLS Session Hash 和扩展的 Master Secret 扩展支持     | 已弃用的 Pre-1.2 SecurityManager 方法和字段、policytool 工具、com.sun.security.auth 中已弃用的类 | java.security.{Certificate,Identity,IdentityScope,Signer} APIs、 java.security.acl APIs、 javax.security.auth.Policy API |
 
@@ -85,14 +103,13 @@
 | -------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | 语言     | **Lambda 参数的局部变量使用 var 语法**                       |                                                              |                                                              |
 | 核心库   | **HTTP 客户端（标准）**、**新的 Collection.toArray(IntFunction) 默认方法**、 | sun.misc.Unsafe.defineClass、**Thread.destroy() 和 Thread.stop(Throwable) 方法**、sun.nio.ch.disableSystemWideOverlappingFileLockCheck 属性 | ThreadPoolExecutor 不应该指定对终结方法的依赖、**Nashorn JavaScript 引擎** |
-| JVM      | 编译器线程的延迟分配、**ZGC 可扩展的低延迟垃圾收集器（实验性）**、**Epsilon 无操作垃圾收集器**、低开销堆分析、基于嵌套的访问控制 |                                                              | -XX+AggressiveOpts、对商业功能的过时支持                     |
-| 工具     | 启动单文件源代码程序                                         | **Java Mission Control (JMC)**、**Java EE 和 CORBA 模块**    |                                                              |
-| javadoc  |                                                              |                                                              |                                                              |
+| JVM      | 编译器线程的延迟分配、**ZGC 可扩展的低延迟垃圾收集器（实验性）**、**Epsilon 无操作垃圾收集器**、低开销堆分析、基于嵌套的访问控制、<br/>*动态类文件常量*、*改进 Aarch64 内在函数*、***飞行记录仪（Flight Recorder）*** |                                                              | -XX+AggressiveOpts、对商业功能的过时支持                     |
+| 工具     | 启动单文件源代码程序                                         | **Java Mission Control (JMC)**、**Java EE 和 CORBA 模块**    | Pack200 工具和 API                                           |
 | 部署     |                                                              | Java 部署技术                                                |                                                              |
 | svc      |                                                              | JVM-MANAGEMENT-MIB.mib、SNMP 代理                            |                                                              |
 | 国际化   | **Unicode 10**、将语言环境数据更新为 Unicode CLDR v33        | sun.locale.formatasdefault 属性                              |                                                              |
 | 客户端库 |                                                              | **JavaFX**、com.sun.awt.AWTUtilities 类、Oracle JDK 中的 Lucida 字体、appletviewer Launcher、Oracle JDK 的 javax.imageio JPEG 插件不再支持带 alpha 的图像 | NSWindowStyleMaskTexturedBackground                          |
-| 安全     | 与 Curve25519 和 Curve448 的 JEP 324 密钥协议、Brainpool EC 支持、ChaCha20 和 Poly1305 加密算法、增强的密钥库机制、向 SunMSCAPI 添加 RSASSA-PSS 签名支持、传输层安全 (TLS) 1.3、支持 RFC 8009 中定义的 Kerberos 5 的 HMAC-SHA2 的 AES 加密 |                                                              | 基于流的 GSSContext 方法、Pack200 工具和 API                 |
+| 安全     | 与 Curve25519 和 Curve448 的 JEP 324 密钥协议、Brainpool EC 支持、ChaCha20 和 Poly1305 加密算法、增强的密钥库机制、向 SunMSCAPI 添加 RSASSA-PSS 签名支持、传输层安全 (TLS) 1.3、支持 RFC 8009 中定义的 Kerberos 5 的 HMAC-SHA2 的 AES 加密 |                                                              | 基于流的 GSSContext 方法                                     |
 
 ## JDK 12
 
@@ -100,10 +117,8 @@
 | -------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ----------------------- |
 | 语言     | **switch 表达式（预览）**                                    |                                                              |                         |
 | 核心库   | Linux 上的POSIX_SPAWN 选项、JVM 常量 API、紧凑数字格式       | FileInputStream 和 FileOutputStream 中的 finalize 方法、 java.util.ZipFile/Inflator/Deflator 中的 finalize 方法 |                         |
-| JVM      | ZGC 并发类卸载、在备用内存设备上分配老一代 Java 堆、HotSpot Windows 操作系统检测正确识别 Windows Server 2019、命令行标志 -XX+ExtensiveErrorReports |                                                              | -XX+/-MonitorInUseLists |
-| 工具     | jdeps --print-module-deps 报告传递依赖                       | javac 对 6/1.6 源、目标和发布值的支持                        |                         |
-| javadoc  |                                                              |                                                              |                         |
-| 部署     |                                                              |                                                              |                         |
+| JVM      | ZGC 并发类卸载、在备用内存设备上分配老一代 Java 堆、HotSpot Windows 操作系统检测正确识别 Windows Server 2019、命令行标志 -XX+ExtensiveErrorReports、<br/>***Shenandoah：一种低暂停时间的垃圾收集器（实验性）***、*仅维护单个 AArch64 端口*、*默认CDS档案*、***G1 的可中止混合收集***、***立即从 G1 返回未使用的已提交内存*** |                                                              | -XX+/-MonitorInUseLists |
+| 工具     | jdeps --print-module-deps 报告传递依赖、<br/>***微基准套件（JMH）*** | javac 对 6/1.6 源、目标和发布值的支持                        |                         |
 | svc      |                                                              | 从 Oracle 生成的构建中的 YY.M 供应商版本字符串               |                         |
 | 国际化   | **Unicode 11**、日文新年号的方形字符支持                     |                                                              |                         |
 | 客户端库 |                                                              | com.sun.awt.SecurityWarning 类                               |                         |
@@ -114,13 +129,11 @@
 | 所属范围 | 新特性                                                       | 删除                                                         | 弃用                                             |
 | -------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------ |
 | 语言     | **switch表达式（预览版）**、**文本块（预览版）**             |                                                              |                                                  |
-| 核心库   | FileSystems.newFileSystem(Path, Map<String, ?>) 方法、新的 java.nio.ByteBuffer Bulk get/put 方法传输字节而不考虑缓冲区位置、java.time 日本新纪元名令和 | 运行时跟踪方法、JDK 1.4 之前的 SocketImpl 实现               | 已弃用的 rmic 删除工具                           |
+| 核心库   | FileSystems.newFileSystem(Path, Map<String, ?>) 方法、新的 java.nio.ByteBuffer Bulk get/put 方法传输字节而不考虑缓冲区位置、java.time 日本新纪元名令和、<br/>*重新实现旧的 Socket API* | 运行时跟踪方法、JDK 1.4 之前的 SocketImpl 实现               | 已弃用的 rmic 删除工具                           |
 | JVM      | ZGC 取消提交未使用的内存、-XXSoftMaxHeapSize 标志、ZGC 最大堆大小增加到 16TB、动态 CDS 归档 | VM 选项 -XX+AggressiveOpts                                   | 不推荐使用的 Java 选项 -Xverifynone 和 -noverify |
 | 工具     | 使用命名空间支持创建 DOM 和 SAX 工厂的新方法                 |                                                              |                                                  |
 | javadoc  |                                                              | 从 javadoc 工具中删除旧功能                                  |                                                  |
-| 部署     |                                                              |                                                              |                                                  |
-| svc      |                                                              |                                                              |                                                  |
-| 国际化   | Unicode 12.1                                                 |                                                              |                                                  |
+| 国际化   | **Unicode 12.1**                                             |                                                              |                                                  |
 | 客户端库 |                                                              | awt.toolkit 系统属性                                         | macOS 上已弃用且不受支持的 Swing Motif 外观      |
 | 安全     | CRL 的可配置读取超时、用于显示 TLS 配置信息的新 keytool -showinfo -tls 命令、支持下一代 MS 加密 (CNG)、SunPKCS11 Provider 升级支持 PKCS#11 v2.40、支持 TLS 中的 X25519 和 X448、JSSE 中没有服务器端状态的会话恢复、允许限制 SASL 机制、规范 XML 1.1 URI 的新字符串常量、[xmldsig] 添加 KeyValueEC_TYPE、在 Windows 上添加了默认的本机 GSS-API 库、支持 Kerberos 跨领域引用 (RFC 6806) | SunJSSE 提供程序不再支持重复的 RSA 服务、T-Systems Deutsche Telekom 根 CA 2 证书、两个 DocuSign 根 CA 证书、两个 Comodo 根 CA 证书、内部 com.sun.net.ssl 包、从 SunJSSE Provider 中删除实验性 FIPS 140 兼容模式 | 不推荐使用的 javax.security.cert API             |
 
@@ -128,33 +141,57 @@
 
 | 所属范围 | 新特性                                                       | 删除                                                    | 弃用                                                         |
 | -------- | ------------------------------------------------------------ | ------------------------------------------------------- | ------------------------------------------------------------ |
-| 语言     | **Record 记录（预览版）**                                    |                                                         |                                                              |
-| 核心库   | 会计货币格式支持、明确 ReadableByteChannel.read() 规范及相关方法 | sun.nio.cs.map 系统属性                                 | 不推荐线程 suspend / resume                                  |
-| JVM      | Windows 和 macOS 上的 ZGC（实验性）、Parallel GC 改进、G1 的 NUMA 感知内存分配、JFR 事件流 | **并发标记清除 (CMS) 垃圾收集器**                       | **弃用 ParallelScavenge + SerialOld GC 组合**                |
-| 工具     | 允许默认调用可发现的 javac 插件、SAX ContentHandler 处理 XML 声明的新方法 | Pack200 工具和 API                                      |                                                              |
-| javadoc  |                                                              |                                                         |                                                              |
+| 语言     | **记录（Record）（预览版）**、<br/>***instanceof 的模式匹配（预览版）***、***switch 表达式***、***文本块（第二次预览）*** |                                                         |                                                              |
+| 核心库   | 会计货币格式支持、明确 ReadableByteChannel.read() 规范及相关方法、<br/>*非易失性映射字节缓冲区*、*外部内存访问 API（孵化器）* | sun.nio.cs.map 系统属性                                 | 不推荐线程 suspend / resume                                  |
+| JVM      | **Windows 和 macOS 上的 ZGC（实验性）**、Parallel GC 改进、G1 的 NUMA 感知内存分配、JFR 事件流、<br/>***有用的 NullPointerExceptions*** | **并发标记清除 (CMS) 垃圾收集器**                       | **弃用 ParallelScavenge + SerialOld GC 组合**、<br/>*弃用 Solaris 和 SPARC 端口* |
+| 工具     | 允许默认调用可发现的 javac 插件、SAX ContentHandler 处理 XML 声明的新方法、<br/>*打包工具（孵化器）* | Pack200 工具和 API                                      |                                                              |
 | 部署     |                                                              | netscape.javascript.JSObjectgetWindow 方法              |                                                              |
-| svc      |                                                              |                                                         |                                                              |
-| 国际化   |                                                              |                                                         |                                                              |
 | 客户端库 |                                                              |                                                         | 不推荐使用 NSWindowStyleMaskTexturedBackground               |
 | 安全     | 默认禁用 TLS、CertPath 和签名 JAR 中的弱命名曲线、Apache Santuario 库更新到版本 2.1.4 | 已弃用的 java.security.acl API、默认 keytool -keyalg 值 | 弃用了旧版椭圆曲线以进行删除、不推荐使用 OracleUcrypto JCE Provider |
 
 ## JDK 15
 
-| 所属范围 | 新特性 | 删除 | 弃用 |
-| -------- | ------ | ---- | ---- |
-| 语言     |        |      |      |
-| 核心库   |        |      |      |
-| JVM      |        |      |      |
-| 工具     |        |      |      |
-| javadoc  |        |      |      |
-| 部署     |        |      |      |
-| svc      |        |      |      |
-| 国际化   |        |      |      |
-| 客户端库 |        |      |      |
-| 安全     |        |      |      |
+| 所属范围 | 新特性                                                       | 删除                                                         | 弃用                                                         |
+| -------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| 语言     | **隐藏类**、**文本块**、<br/>***密封类（预览版）***、***instanceof 的模式匹配（第二次预览）***、***记录（Record）（第二次预览）*** |                                                              |                                                              |
+| 核心库   | 为 CharSequence 添加了 isEmpty 默认方法、对 SO_INCOMING_NAPI_ID 的支持、 **TreeMap 方法的特殊实现**、<br/>*重新实现旧的 DatagramSocket API*、*外部内存访问 API（第二个孵化器）* | 最终弃用的 Solaris 特定 SO_FLOW_SLA 套接字选项、RMI 静态存根编译器 (rmic)、**Nashorn JavaScript 引擎** | RMI 激活                                                     |
+| JVM      | 为调试模式添加到 jhsdb 的新选项、<br/>***ZGC：可扩展的低延迟垃圾收集器（产品）***、***Shenandoah：低暂停时间垃圾收集器（产品）*** | 已过时 -XXUseAdaptiveGCBoundary、<br/>*删除 Solaris 和 SPARC 端口* | -XXForceNUMA 选项、禁用偏向锁定和不推荐使用的偏向锁定标志    |
+| 工具     | 为 jstatd 添加了用于指定 RMI 连接器端口号的新选项、为 jcmd 添加了用于编写 gzipped 堆转储的新选项 |                                                              |                                                              |
+| javadoc  |                                                              |                                                              |                                                              |
+| 部署     |                                                              |                                                              | NSWindowStyleMaskTexturedBackground                          |
+| svc      | 为远程 JMX 配置第三个端口的功能                              | 已弃用的常量 RMIConnectorServer.CREDENTIAL_TYPES             |                                                              |
+| 国际化   | **Unicode 13.0**                                             |                                                              |                                                              |
+| 安全     | 为 jarsigner 添加了撤销检查、如果使用了弱算法工具会发出警告、SunJCE Provider 支持基于 SHA-3 的 Hmac 算法、用于配置 TLS 签名方案的新系统属性、支持 certificate_authorities 扩展、支持 krb5.conf 中的规范化、支持跨域MSSFU、<br/>*爱德华兹曲线数字签名算法 (EdDSA)* | Comodo 根 CA 证书、DocuSign 根 CA 证书、已弃用的 SSLSession.getPeerCertificateChain() 方法实现、com.sun.net.ssl.internal.ssl.Provider 名称 | 默认禁用本机 SunEC 实现、为先前弃用的 ContentSigner API 添加了 forRemoval=true |
 
+## JDK 16
 
+| 所属范围 | 新特性                                                       | 删除                                                         | 弃用                                                         |
+| -------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| 语言     | **密封类（第二次预览）**、**记录（Record）**、**instanceof 的模式匹配** |                                                              |                                                              |
+| 核心库   | 外部链接器 API（孵化器）、**默认情况下对 JDK 内部进行强封装**、外部内存访问 API（第三个孵化器）、**基于值的类的警告**、添加 InvocationHandler::invokeDefault 方法用于 Proxy 的默认方法支持、Unix 域套接字、java.time 格式添加了日时段支持、**添加 Stream.toList() 方法** |                                                              | **最终弃用的线程组stop、destroy、isDestroyed、setDaemon 和 isDaemon** |
+| JVM      | 矢量 API（孵化器）、改进的编译命令标志、**ZGC 并发堆栈处理**、**在 G1 中同时取消提交内存**、默认启用新的 jdk.ObjectAllocationSample 事件、**弹性元空间**、<br/>*启用 C++14 语言功能*、*Alpine Linux 端口*、*Windows/AArch64 端口* | **去除实验特征 AOT 和 Graal JIT**、已弃用的跟踪标志已过时，必须用统一日志等效项替换 | 部分 Signal-Chaining API 已弃用                              |
+| 工具     | 打包工具                                                     |                                                              |                                                              |
+| javadoc  |                                                              |                                                              |                                                              |
+| 部署     |                                                              |                                                              |                                                              |
+| 基础设施 | *从 Mercurial 迁移到 Git*、*迁移到 GitHub*                   |                                                              |                                                              |
+| 国际化   |                                                              |                                                              |                                                              |
+| 客户端库 |                                                              | 删除 java.awt.PeerFixer                                      |                                                              |
+| 安全     | 对 RSASSA-PSS 和 EdDSA 的签名 JAR 支持、 SUN \ SunRsaSign 和 SunEC 提供商支持基于 SHA-3 的签名算法、 jarsigner 保留 POSIX 文件权限和符号链接属性、在 keytool -printcert 和 -printcrl 命令中添加了 -trustcacerts 和 -keystore 选项、 SunPKCS11 Provider 支持 SHA-3 相关算法、改进证书链处理、 改进 TLS 应用层协议协商 (ALPN) 值的编码、EdDSA 签名算法的 TLS 支持 | 1024 位密钥的根证书、传统的椭圆曲线                          | 弃用了将 DN 表示为主体或字符串对象的 java.security.cert API  |
+
+## JDK 17
+
+| 所属范围 | 新特性                                                       | 删除                                                         | 弃用                                                     |
+| -------- | ------------------------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------------- |
+| 语言     | **密封类**、**switch 模式匹配（预览版）**、<br/>***恢复始终严格的浮点语义*** |                                                              |                                                          |
+| 核心库   | DatagramSocket 可直接用于加入多播组、在 macOS 上添加对 UserDefinedFileAttributeView 的支持、**增强的伪随机数生成器**、**外部函数和内存 API（孵化器）**、控制台字符集 API、**用于反序列化的 JDK Flight Recorder 事件**、**实现特定于上下文的反序列化过滤器**、本机字符编码名称的系统属性、添加 java.time.InstantSource、十六进制格式和解析实用程序、<br/>***强封装 JDK 内部***、*矢量 API（第二个孵化器）* | 强封装 JDK 内部相关的选项、sun.misc.Unsafe::defineAnonymousClass、RMI 激活 | 弃用 Socket 实现工厂机制                                 |
+| JVM      | 理想图可视化器（IGV）的现代化、实验编译器黑洞支持、HotSpot JVM中新的类层次分析实现、macOS/AArch64 端口、统一日志支持异步日志刷新 | **实验性 AOT 和 JIT 编译器**                                 | 弃用 JVM TI 堆函数 1.0                                   |
+| 工具     |                                                              |                                                              |                                                          |
+| javadoc  | **错误消息中的源详细信息**、“New API”的新页面和改进的“Deprecated”页面、包摘要页面上的“相关包” |                                                              |                                                          |
+| 部署     |                                                              |                                                              |                                                          |
+| svc      |                                                              |                                                              |                                                          |
+| 国际化   |                                                              |                                                              |                                                          |
+| 客户端库 | 新的 macOS 渲染管道、 用于访问大图标的新 API                 |                                                              | 弃用 Applet API 以进行删除                               |
+| 安全     | 支持在 Keytool -genkeypair 命令中指定签名者、SunJCE Provider 使用 AES 密码支持 KW 和 KWP 模式、新的 SunPKCS11 配置属性、如果 PKCS11 库支持，SunPKCS11 提供程序支持 ChaCha20-Poly1305 Cipher 和 ChaCha20 KeyGenerator、具有系统属性的可配置扩展、如果 default_tkt_enctypes 或 default_tgs_enctypes 不存在，则使用 allowed_enctypes | Telia 公司的 Sonera Class2 CA 证书                           | 弃用安全管理器以进行删除、在 Kerberos 中弃用 3DES 和 RC4 |
 
 # JDK 9 ~ 17 各个版本的重要新特性
 
@@ -308,6 +345,26 @@ macOS 11.0 现在支持 AArch64 架构。这个 JEP 在 JDK 中实现了对 maco
 
 相关的包不必都在同一个模块中。
 
+### OpenJDK 文档中提到的特性
+
+#### JEP 306：恢复始终严格的浮点语义
+
+**【规格 / 语言】**
+
+使浮点运算始终保持严格，而不是同时具有严格的浮点语义 ( `strictfp`) 和细微不同的默认浮点语义。这将恢复语言和 VM 的原始浮点语义，与 Java SE 1.2 中引入严格和默认浮点模式之前的语义相匹配。
+
+#### JEP 403：强封装 JDK 内部
+
+**【核心库】**
+
+强烈封装 JDK 的所有内部元素，除了 关键的内部 API，例如 `sun.misc.Unsafe`。将不再可能通过单个命令行选项放松对内部元素的强封装，这在 JDK 9 到 JDK 16 中是可能的。
+
+#### JEP 414：Vector API（第二个孵化器）
+
+**【核心库】**
+
+引入一个 API 来表达向量计算，该计算可以在运行时可靠地编译为支持的 CPU 架构上的最佳向量指令，从而实现优于等效标量计算的性能。
+
 
 
 ## JDK 16
@@ -326,7 +383,7 @@ macOS 11.0 现在支持 AArch64 架构。这个 JEP 在 JDK 中实现了对 maco
 
 通过此更改，启动器选项的默认值 `--illegal-access` 现在是 `deny` 而不是 `permit`. 因此，使用 JDK 的大多数内部类、方法或字段的现有代码将无法运行。这样的代码可以通过指定在 JDK 16 上运行 `--illegal-access=permit`。但是，该选项将在未来的版本中删除。
 
-### JEP 393：Foreign-Memory Access API（第三个孵化器）
+### JEP 393：外部内存访问（Foreign-Memory Access） API（第三个孵化器）
 
 **【核心库】**
 
@@ -448,6 +505,40 @@ JEP 384: Records (Second Preview) 添加了对本地接口、枚举类和记录�
 
 提供 `jpackage `工具，用于打包自包含的 Java 应用程序。JEP 343 在 JDK 14 中将其 `jpackage tool` 作为孵化工具引入。它仍然是 JDK 15 中的孵化工具，以便有时间获得额外的反馈。它已在 JDK 16 中从孵化升级为生产就绪功能。由于这种转变，`jpackage` 模块的名称已从 `jdk.incubator.jpackage` 更改为`jdk.jpackage`。
 
+### OpenJDK 文档中提到的特性
+
+#### JEP 347：启用 C++14 语言功能
+
+**【HotSpot / 其他】**
+
+允许在 JDK C++ 源代码中使用 C++14 语言功能，并就哪些功能可以在 HotSpot 代码中使用提供具体指导。
+
+#### JEP 357: 从 Mercurial 迁移到 Git
+
+**【基础设施】**
+
+将 OpenJDK 社区的源代码存储库从 Mercurial (hg) 迁移到 Git。
+
+#### JEP 369：迁移到 GitHub
+
+**【基础设施】**
+
+在 GitHub 上托管 OpenJDK 社区的 Git 存储库。与 JEP 357（从 Mercurial 迁移到 Git）一致，这会将所有单存储库 OpenJDK 项目迁移到 GitHub，包括 JDK 功能版本（JDK feature releases）和版本 11 及更高版本的 JDK 更新版本（JDK update releases）。
+
+#### JEP 386：Alpine Linux 端口
+
+**【HotSpot】**
+
+将 JDK 移植到 Alpine Linux，以及其他使用 musl 作为主要 C 库（primary C library）的在 x64 和 AArch64 架构上的 Linux 发行版。
+
+#### JEP 388：Windows/AArch64 端口
+
+**【HotSpot】**
+
+将 JDK 移植到 Windows/AArch64。
+
+
+
 
 
 ## JDK 15
@@ -501,6 +592,62 @@ TreeMap 类现在提供了 `putIfAbsent`、`computeIfAbsent`、`computeIfPresent
 **【工具 / javac】**
 
 文本块已添加到 Java 语言中。文本块是一个多行字符串文字，它避免了大多数转义序列的需要，以可预测的方式自动格式化字符串，并在需要时让开发人员控制格式。
+
+### OpenJDK 文档中提到的特性
+
+#### JEP 339：爱德华兹曲线数字签名算法 (EdDSA)
+
+**【安全库 / javax.crypto】**
+
+如 RFC 8032 所述，使用 Edwards-Curve 数字签名算法 (EdDSA) 实施加密签名。
+
+#### JEP 360：密封类（预览版）
+
+**【规范 / 语言】**
+
+使用密封的（sealed）类和接口增强 Java 编程语言。密封的类和接口限制了哪些其他类或接口可以扩展或实现它们。
+
+#### JEP 373：重新实现旧的 DatagramSocket API
+
+**【核心库 / java.net】**
+
+用易于维护和调试的更简单、更现代的实现替换 `java.net.DatagramSocket` 和 `java.net.MulticastSocket` API的底层实现。新的实现将很容易适应虚拟线程，目前正在 Project Loom 中进行探索。这是JEP 353 的后续，它已经重新实现了旧的 Socket API。
+
+#### JEP 375：instanceof 的模式匹配（第二次预览）
+
+**【规格 / 语言】**
+
+通过*模式匹配*增强 Java 编程语言的 `instanceof` 运算符。模式匹配 使程序中可以更简洁和安全地表达从多个对象中按条件提取组件的通用逻辑。这是 JDK 15 中的预览语言功能。
+
+#### JEP 377：ZGC：可扩展的低延迟垃圾收集器（产品）
+
+**【HotSpot / gc】**
+
+将 Z 垃圾收集器从实验功能更改为产品功能。
+
+#### JEP 379：Shenandoah：低暂停时间垃圾收集器（产品）
+
+**【HotSpot / gc】**
+
+将 Shenandoah 垃圾收集器从实验功能更改为产品功能。
+
+#### JEP 381：删除 Solaris 和 SPARC 端口
+
+**【HotSpot】**
+
+删除源代码并构建对 Solaris/SPARC、Solaris/x64 和 Linux/SPARC 端口的支持。这些端口在 JDK 14 中已被弃用以删除，并明确打算在未来的版本中删除它们。
+
+#### JEP 383：外部内存访问 API（第二个孵化器）
+
+**【核心库】**
+
+引入 API 以允许 Java 程序安全有效地访问 Java 堆之外的外部内存。
+
+#### JEP 384：记录（第二次预览）
+
+**【规范 / 语言】**
+
+使用记录增强 Java 编程语言，记录是充当不可变数据的透明载体的类。记录可以被认为是*名义元组*（*nominal tuples*）。
 
 
 
@@ -558,6 +705,56 @@ G1 尝试使用严格的交错将 Humongous 和 Old 区域均匀分布在所有�
 
 JDK Flight Recorder (JFR) 现在支持对 Java 应用程序的持续监控，方法是允许使用位于 jdk.jfr.consumer 包中的新 API 动态使用事件。使用 JFR 时始终启用该功能，这意味着直到最后一秒的记录数据可用于进程内和进程外消耗。
 
+### OpenJDK 文档中提到的特性
+
+#### JEP 305：instanceof 的模式匹配（预览版）
+
+**【规范 / 语言】**
+
+通过 *模式匹配* 增强 Java 编程语言的 `instanceof` 运算符。模式匹配 使程序中可以更简洁和安全地表达从多个对象中按条件提取组件的通用逻辑。这是 JDK 14 中的预览语言功能。
+
+#### JEP 343：打包工具（孵化器）
+
+**【工具 / jpackage】**
+
+创建用于打包自包含（self-contained）的 Java 应用程序的工具。
+
+#### JEP 352：非易失性映射字节缓冲区(Non-Volatile Mapped Byte Buffers)
+
+**【核心库 / java.nio】**
+
+添加新的 JDK 特定文件映射模式，以便 `FileChannel` API 可用于创建 `MappedByteBuffer` 引用非易失性内存的实例。
+
+#### JEP 358：有用的 NullPointerExceptions
+
+**【HotSpot / 运行时】**
+
+通过精确描述哪个变量是 `null` 来提高 JVM 生成的 `NullPointerException` 可用性 。
+
+#### JEP 361：switch 表达式
+
+**【规格 / 语言】**
+
+扩展 `switch`，使它可以使用语句或表达式，并且两种形式都可以使用传统 `case ... :` 标签（有贯穿（fall through））或新 `case ... ->` 标签（没有贯穿），还有一个新的语句用于从一个 `switch` 中产生一个值表达（yielding a value）。这些更改将简化日常编码，并为在 `switch` 引入模式匹配做准备。这是 JDK 12 和 JDK 13 中的预览语言功能。
+
+#### JEP 362：弃用 Solaris 和 SPARC 端口
+
+**【HotSpot】**
+
+弃用 Solaris/SPARC、Solaris/x64 和 Linux/SPARC 端口，以便在未来的版本中删除它们。
+
+#### JEP 368：文本块（第二次预览）
+
+**【规范 / 语言】**
+
+将*文本块* 添加到 Java 语言。文本块是一个多行字符串，它避免了大多数转义序列的需要，以可预测的方式自动格式化字符串，并在需要时让开发人员控制格式。这是 JDK 14 中的预览语言功能。
+
+#### JEP 370：外部内存访问（Foreign-Memory Access） API（孵化器）
+
+**【核心库】**
+
+引入 API 以允许 Java 程序安全有效地访问 Java 堆之外的外部内存。
+
 
 
 ## JDK 13
@@ -574,7 +771,7 @@ JDK Flight Recorder (JFR) 现在支持对 Java 应用程序的持续监控，方
 
 添加 `newFileSystem(Path, Map<String, ?>)` 方法会对一直使用现有双参数 `newFileSystem(Path, ClassLoader)` 方法并将类加载器指定为 `null` 的代码造成源码（但不是二进制）兼容性问题。例如，由于引用不明确，无法编译以下代码`newFileSystem`：
 
-```
+```java
 FileSystem fs = FileSystems.newFileSystem(path, null);
 ```
 
@@ -659,7 +856,7 @@ JEP 350 扩展了应用程序类数据共享（application class-data sharing，
 -XX:SharedArchiveFile=<base archive>:<dynamic archive><br>
 ```
 
-### JEP 354 开关表达式（预览版）
+### JEP 354 switch 表达式（预览版）
 
 **【工具 / javac】**
 
@@ -670,6 +867,14 @@ JEP 350 扩展了应用程序类数据共享（application class-data sharing，
 **【工具 / javac】**
 
 将文本块添加到 Java 语言。文本块是一个多行字符串文字，它避免了大多数转义序列的需要，以可预测的方式自动格式化字符串，并在需要时让开发人员控制格式。这是 JDK 13 中的预览语言功能。
+
+### OpenJDK 文档中提到的特性
+
+#### JEP 353：重新实现旧的 Socket API
+
+**【核心库 / java.net】**
+
+`java.net.Socket` 和 `java.net.ServerSocket` API使用的底层实现将替换为更简单、更现代且易于维护和调试的实现。新的实现将很容易适应用户模式线程，也就是纤程，目前正在 Project Loom 中探索。
 
 
 
@@ -769,6 +974,44 @@ G1 和并行 GC 中的这个实验性功能允许他们在备用内存设备（�
 **【工具 / javac】**
 
 Java 语言增强了 `switch` 语句，使其既可以用作语句，也可以用作表达式。用作 `switch` 表达式通常会使代码更简洁易读。语句和表达式形式都可以使用传统`case ... :`标签（有贯穿（fall through））或简化`case ... ->`标签（没有贯穿）。此外，两种形式都可以在一种情况下打开多个常量。这些增强功能`switch`是预览语言功能
+
+### OpenJDK 文档中提到的特性
+
+#### JEP 189：Shenandoah：一种低暂停时间的垃圾收集器（实验性）
+
+**【HotSpot / gc】**
+
+添加一个名为 Shenandoah 的新垃圾收集 (GC) 算法，该算法通过与正在运行的 Java 线程同时进行以疏散工作来减少 GC 暂停时间。Shenandoah 的暂停时间与堆大小无关，这意味着无论您的堆是 200 MB 还是 200 GB，您都将拥有相同的一致暂停时间。
+
+#### JEP 230：微基准套件
+
+**【性能】**
+
+在 JDK 源代码中添加一套基本的微基准测试，让开发人员可以轻松运行现有的微基准测试并创建新的微基准测试。
+
+#### JEP 340：一个 AArch64 端口，而不是两个
+
+**【HotSpot】**
+
+删除所有与 `arm64` 端口相关的源，同时保留 32 位 ARM 端口和 64 位 `aarch64` 端口。
+
+#### JEP 341：默认 CDS 档案
+
+**【HotSpot / 运行时】**
+
+增强 JDK 构建过程以在 64 位平台上使用默认类列表生成类数据共享 (CDS) 存档。
+
+#### JEP 344：G1 的可中止混合收集（Abortable Mixed Collections）
+
+**【HotSpot / gc】**
+
+如果 G1 混合收集（mixed collections）可能超过暂停目标，则使它们可中止。
+
+#### JEP 346：立即从 G1 返回未使用的已提交内存
+
+**【HotSpot / gc】**
+
+增强 G1 垃圾收集器在空闲时自动将 Java 堆内存返回给操作系统。
 
 
 
@@ -909,6 +1152,26 @@ Epsilon GC 是新的实验性无操作垃圾收集器。Epsilon GC 只处理内�
 
 增强 java 启动器以运行作为单个 Java 源代码文件提供的程序，包括通过“shebang”文件和相关技术在脚本中使用。
 
+### OpenJDK 文档中提到的特性
+
+#### JEP 309：动态类文件常量
+
+**【HotSpot / 运行时】**
+
+扩展 Java 类文件格式以支持新的常量池形式 `CONSTANT_Dynamic`。加载 `CONSTANT_Dynamic` 将委托创建到引导方法，就像链接 `invokedynamic` 调用站点委托链接到引导方法一样。
+
+#### JEP 315：改进 Aarch64 内在函数
+
+**【HotSpot / 编译器】**
+
+改进现有的字符串和数组内在函数，并在 AArch64 处理器上为 `java.lang.Math ` 的 sin、cos 和 log 函数实现新的内在函数。
+
+#### JEP 328：飞行记录仪（Flight Recorder）
+
+**【HotSpot / jfr】**
+
+为 Java 应用程序和 HotSpot JVM 故障排除提供低开销数据收集框架。
+
 
 
 ## JDK 10
@@ -966,6 +1229,62 @@ javadoc 工具中添加了一个新的选项 `--overridden-methods=` 值。许�
 **【工具/javadoc（工具）】**
 
 添加了一个新的内联标记 ，`{@summary ...}` 以明确指定用作 API 描述摘要的文本。默认情况下，API 描述的摘要是从第一句话推断出来的。这是通过使用简单算法或 `java.text.BreakIterator`. 但是，对此的启发式方法并不总是正确的，并且可能导致错误地确定第一句的结尾。新标签使 API 摘要文本能够被显式设置而不是推断。
+
+### OpenJDK 文档中提到的特性
+
+#### JEP 286：局部变量类型推断
+
+**【工具】**
+
+增强 Java 语言以将类型推断扩展到使用初始化程序的局部变量声明。
+
+#### JEP 296：将 JDK 森林整合到一个存储库中
+
+**【基础结构 / 构建】**
+
+将 JDK 森林（Forest）的众多存储库组合到一个存储库中，以简化和简化开发。
+
+#### JEP 304：垃圾收集器接口
+
+**【HotSpot / gc】**
+
+通过引入干净的垃圾收集器（GC）接口，改进不同垃圾收集器的源代码隔离。
+
+#### JEP 310：应用程序类-数据共享
+
+**【HotSpot / 运行时】**
+
+为了改善启动和占用空间，扩展现有的类数据共享（“CDS”）功能以允许将应用程序类放置在共享存档中。
+
+#### JEP 312：线程本地握手
+
+**【HotSpot / 运行时】**
+
+引入一种无需执行全局 VM 安全点即可在线程上执行回调的方法。使停止单个线程既可行又成本低，而不是需要在要么停止所有线程要么不停止线程中二选一。
+
+#### JEP 314：额外的 Unicode 语言标签扩展
+
+**【核心库 / java.util : i18n】**
+
+增强 `java.util.Locale` 和相关 API 以实现 BCP 47 语言标签的额外 Unicode 扩展。
+
+#### JEP 316：替代存储设备上的堆分配
+
+**【HotSpot / gc】**
+
+启用 HotSpot VM 以在用户指定的备用内存设备（例如 NV-DIMM）上分配 Java 对象堆。
+
+#### JEP 317：实验性的基于 Java 的 JIT 编译器
+
+**【HotSpot / 编译器】**
+
+启用基于 Java 的 JIT 编译器 Graal，用作 Linux/x64 平台上的实验性 JIT 编译器。
+
+#### JEP 322：基于时间的发布版本控制
+
+**【核心库 / java.lang】**
+
+修改 Java SE 平台和 JDK 的版本字符串方案，以及相关的版本信息，以用于当前和未来的基于时间的发布模型。
 
 
 
@@ -1996,7 +2315,7 @@ JavaFX Media 中删除了对 VP6 视频编码格式和 FXM/FLV 容器的支持�
 
 ## JDK 15
 
-###  已弃用的 RMI 激活删除
+###  已弃用的 RMI 激活以删除
 
 **【核心库 / java.rmi】**
 
