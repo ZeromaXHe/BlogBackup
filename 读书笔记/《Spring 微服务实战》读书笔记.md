@@ -57,7 +57,7 @@ public class Application {
 - 性能和可伸缩性
 - 客户期望他们的应用程序可用
 
-为了满足这些期望，作为应用开发人员不得不接收这样一个悖论：构建高可伸缩性和高度冗余的应用程序。我们需要将应用程序分解成可以互相独立构建和部署的小型服务。如果将应用程序“分解”为小型服务，并将它们从单体制品中转移出来，那么就可以构建具有下面这些特性的系统：
+为了满足这些期望，作为应用开发人员不得不接受这样一个悖论：构建高可伸缩性和高度冗余的应用程序。我们需要将应用程序分解成可以互相独立构建和部署的小型服务。如果将应用程序“分解”为小型服务，并将它们从单体制品中转移出来，那么就可以构建具有下面这些特性的系统：
 
 - **灵活性**——可以将解耦的服务进行组合和重新安排，以快速交付新的功能。一个正在使用的代码单元越小，更改代码越不复杂，测试部署代码所需的时间越短。
 - **有弹性**——解耦的服务意味着应用程序不再是单个“泥浆球”，在这种架构中其中一部分应用程序的降级会导致整个应用程序失败。故障可以限制在应用程序的一小部分之中，并在整个应用程序遇到中断之前被控制。这也使应用程序在出现不可恢复的错误的情况下能够优雅地降级。
@@ -99,7 +99,7 @@ public class Application {
 
 本书采用基于模式的方法来回答这些问题。通过基于模式的方法，本书列出可以跨不同技术实现来使用的通用设计。虽然本书选择了使用 Spring Boot 和 Spring Cloud 来实现本书中所使用的模式，但开发人员完全可以把这些概念和其他技术平台一起使用。具体来说，本书涵盖以下 6 类微服务模式：
 
-- 核心微服务开发模式：服务粒度、通信协议、接口涉及、服务的配置管理、服务之间的事件处理
+- 核心微服务开发模式：服务粒度、通信协议、接口设计、服务的配置管理、服务之间的事件处理
 - 微服务路由模式：服务发现、服务路由
 - 微服务客户端弹性模式：客户端负载均衡、断路器模式、后备模式、舱壁模式
 - 微服务安全模式：验证、授权、凭据管理和传播
@@ -144,11 +144,11 @@ Spring Cloud Stream 是一种可让开发人员轻松地将轻量级消息处理
 
 Spring Cloud Sleuth 允许将唯一跟踪标识符集成到应用程序所使用的 HTTP 调用和消息通道(RabbitMQ、Apache Kafka ）之中。这些跟踪号码（有时称为关联 ID 或跟踪 ID ）能够让开发人员在事务流经应用程序中的不同服务时跟踪事务。有了 Spring Cloud Sleuth ，这些跟踪 ID 将自动添加到微服务生成的任何日志记录中。
 
-Spring Cloud Sleuth 与日志聚合技术工具（如 Papertrail ）和跟踪工具（如 Zipkin ）结合时，能够展现出 正的威力 Papertail 个基于 的日志记录平台，用于将日志从不同的微服务实时聚合到一个可查询的数据库中。Zipkin 可以获取 Sprin Cloud Sleuth 生成的数据，并允许开发人员可视化单个事务涉及的服务调用流程。
+Spring Cloud Sleuth 与日志聚合技术工具（如 Papertrail ）和跟踪工具（如 Zipkin ）结合时，能够展现出真正的威力。Papertail 是一个基于云的日志记录平台，用于将日志从不同的微服务实时聚合到一个可查询的数据库中。Zipkin 可以获取 Sprin Cloud Sleuth 生成的数据，并允许开发人员可视化单个事务涉及的服务调用流程。
 
 ### 1.10.8 Spring Cloud Security
 
-Spring Cloud Security 个验证和授权框架，可以控制哪些人可以访问服务，以及他们可以用服务做什么。Spring Cloud Security 是基于令牌的，允许服务通过验证服务器发出的令牌彼此进行通信。接收调用的每个服务可以检查 HTTP 调用中提供的令牌，以确认用户的身份以及用户对该服务的访问权限。
+Spring Cloud Security 是一个验证和授权框架，可以控制哪些人可以访问服务，以及他们可以用服务做什么。Spring Cloud Security 是基于令牌的，允许服务通过验证服务器发出的令牌彼此进行通信。接收调用的每个服务可以检查 HTTP 调用中提供的令牌，以确认用户的身份以及用户对该服务的访问权限。
 
 此外， Spring Cloud Security 支持 JSON Web Token。JSON Web Token ( JWT ）框架标准化了创建 OAuth2 令牌的格式，并为创建的令牌进行数字签名提供了标准。
 
@@ -199,7 +199,7 @@ public class Application {
 使用传统的瀑布方法所面临的挑战在于，许多时候，这些项目交付的软件制品的粒度具有以下特点
 
 - **紧耦合的**一一业务逻辑的调用发生在编程语言层面，而不是通过实现中立的协议（如 SOAP 和 REST）。这大大增加了即使对应用程序组件进行小的修改也可能打破应用程序的其他部分并引入新漏洞的机会。
-- **有漏洞的**一一大多数大型软件应用程序都在管理着不同类型的数据。例如，客户关系管理（ CRM ）应用程序可能会管理客户、销售和产品信息 在传统的模型里，这些数据位于相同的数据模型巾并在同一个数据存储中保存。即使数据之间存在明显的界限，在绝大多数的情况下，来自一个领域的团队也很容易直接访问属于另一个团队的数据。这种对数据的轻松访问引入了隐藏的依赖关系，并让组件的内部数据结构的实现细节泄漏到整个应用程序中。即使对单个数据库表的更改也可能需要在整个应用程序中进行大量的代码更改和回归测试。
+- **有漏洞的**一一大多数大型软件应用程序都在管理着不同类型的数据。例如，客户关系管理（ CRM ）应用程序可能会管理客户、销售和产品信息 在传统的模型里，这些数据位于相同的数据模型中并在同一个数据存储中保存。即使数据之间存在明显的界限，在绝大多数的情况下，来自一个领域的团队也很容易直接访问属于另一个团队的数据。这种对数据的轻松访问引入了隐藏的依赖关系，并让组件的内部数据结构的实现细节泄漏到整个应用程序中。即使对单个数据库表的更改也可能需要在整个应用程序中进行大量的代码更改和回归测试。
 - **单体的**一一由于传统应用程序的大多数组件都存放在多个团队共享的单个代码库中，任何时候更改代码，整个应用程序都必须重新编译、重新运行并且需要通过一个完整的测试周期并重新部署。无论是新客户的需求还是修复错误，应用程序代码库的微小变化都将变得昂贵和耗时，并且几乎不可能及时实现大规模的变化。
 
 基于微服务的架构采用不同的方法来交付功能。具体来说， 基于微服务的架构具有以下特点：
@@ -339,11 +339,11 @@ public class LicenseServiceController {
 > 2. JSON 易于人们阅读和消费。
 > 3. JSON 是 JavaScript 使用的默认序列化协议。
 >
-> 其他机制和协议能够比 JSON 更有效地在服务之间进行通信。Apache Thrift 框架允许构建使用二进制协议相互通信地多语言服务。Apache Avro 协议是一种数据序列化协议，可在客户端和服务器调用之间将数据转换为二进制格式。
+> 其他机制和协议能够比 JSON 更有效地在服务之间进行通信。Apache Thrift 框架允许构建使用二进制协议相互通信的多语言服务。Apache Avro 协议是一种数据序列化协议，可在客户端和服务器调用之间将数据转换为二进制格式。
 
 
 
-代码清单中展示地第二个注解是 `@RequestMapping`。可以使用 `@RequestMapping` 作为类级注解和方法级注解。 `@RequestMapping` 注解用于告诉 Spring 容器该服务将要公开的 HTTP 端点。使用类级的 `@RequestMapping` 注解时，将为该控制器公开的所有其他端点建立 URL 的根。
+代码清单中展示的第二个注解是 `@RequestMapping`。可以使用 `@RequestMapping` 作为类级注解和方法级注解。 `@RequestMapping` 注解用于告诉 Spring 容器该服务将要公开的 HTTP 端点。使用类级的 `@RequestMapping` 注解时，将为该控制器公开的所有其他端点建立 URL 的根。
 
 `{organizationId}` 是一个占位符，表明如何使用在每个调用中传递的 `organizationId` 来参数化 URL。
 
@@ -417,3 +417,360 @@ public License getLicenses(
 3. DevOps 工程师一一服务不存在于真空中。尽早建立服务的生命周期。DevOps 视角不仅要关注如何自动化服务的构建和部署，还要关注如何监控服务的健康状况，并在出现问题时做出反应。实施服务通常需要比编写业务逻辑更多的工作，也更需要深谋远虑。
 
 # 第3章 使用 Spring Cloud 配置服务器控制配置
+
+基于云的微服务开发强调一下几点：
+
+1. 应用程序的配置与正在部署的实际代码完全分离。
+2. 构建服务器、应用程序以及一个不可变的镜像，它们在各环境中进行提升时永远不会发生变化。
+3. 在服务器启动时通过环境变量注入应用程序配置信息，或者在微服务启动时通过集中式存储库读取应用程序配置信息。
+
+## 3.1 管理配置（和复杂性）
+
+应用程序配置管理的 4 条原则：
+
+1. **分离**——我们希望将服务配置信息与服务的实际物理部署完全分开。应用程序配置不应与服务实例一起部署。相反，配置信息应该作为环境变量传递给正在启动的服务，或者在服务启动时从集中式存储库中读取。
+2. **抽象**——将访问配置数据的功能抽象到一个服务接口中。应用程序使用基于 REST 的 JSON 服务来检索配置数据，而不是编写直接访问服务存储库的代码（也就是从文件或使用 JDBC 从数据库读取数据）。
+3. **集中**——因为基于云的应用程序可能会有数百个服务，所以最小化用于保存配置信息的不同存储库的数量至关重要。将应用程序配置集中在尽可能少的数据库中。
+4. **稳定**——因为应用程序的配置信息与部署的服务完全隔离并集中存放，所以不管采用何种方案实现，至关重要的一点就是保证其高可用和冗余。
+
+### 3.1.1 配置管理架构
+
+服务引导过程：
+
+1. 当一个微服务实例出现时，它将调用一个服务端点来读取其所在环境的特定配置信息。配置管理的连接信息（连接凭据、服务端点等）将在微服务启动时被传递给微服务。
+2. 实际的配置信息驻留在存储库中。基于配置存储库的实现，可以选择使用不同的实现来保存配置数据。配置存储库的实现选择可以包括源代码控制下的文件、关系数据库或键值数据存储。
+3. 应用程序配置数据的实际管理与应用程序的部署方式无关。配置管理的更改通常通过构建和部署管道来处理，其中配置的更改可以通过版本信息进行标记，并通过不同的环境进行部署。
+4. 进行配置管理更改时，必须通知使用该应用程序配置数据的服务，并刷新应用程序数据的副本。
+
+### 3.1.2 实施选择
+
+| 项目名称            | 描述                                                         | 特点                                                         |
+| ------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| Etcd                | 使用 Go 开发的开源项目，用于服务发现和键值管理，使用 raft 协议作为它的分布式计算模型 | 非常快和可伸缩<br/>可分布式<br/>命令行驱动<br/>易于搭建和使用 |
+| Eureka              | 由 Netflix 开发，久经测试，用于服务发现和键值管理            | 分布式键值存储<br/>灵活，需要费些功夫去设置<br/>提供开箱即用的动态客户端刷新 |
+| Consul              | 由 Hashicorp 开发，特性上类似于 Etcd 和 Eureka，它的分布式计算模型使用了不同的算法（SWIM 协议） | 快速<br/>提供本地服务发现功能，可直接与 DNS 集成<br/>没有提供开箱即用的动态客户端刷新 |
+| ZooKeeper           | 一个提供分布式锁定功能的 Apache 项目，经常用作访问键值数据的配置管理解决方案 | 最古老的、最久经测试的解决方案<br/>使用最为复杂<br/>可用作配置管理，但只有在其他架构中已经使用了 ZooKeeper 的时候才考虑使用它 |
+| Spring Cloud Config | 一个开源项目，提供不同后端支持的通用配置管理解决方案。它可以将 Git、Eureka 和 Consul 作为后端进行整合 | 非分布式键值存储<br/>提供了对 Spring 和非 Spring 服务的紧密集成<br/>可以使用多个后端来存储配置数据，包括共享文件系统、Eureka、Consul 和 Git |
+
+对于本章和本书其余部分的示例，都将使用 Spring Cloud 配置服务器。选择这个解决方案处于多种原因：
+
+1. Spring Cloud 配置服务器易于搭建和使用。
+2. Spring Cloud 配置与 Spring Boot 紧密集成。开发人员可以使用一些简单易用的注解来读取所有应用程序的配置数据。
+3. Spring Cloud 配置服务器提供多个后端用于存储配置数据。如果读者已经使用了 Eureka 和 Consul 等工具，那么可以将它们直接插入 Spring Cloud 配置服务器中。
+4. 上表所示的所有解决方案中，Spring Cloud 配置服务器可以直接与 Git 源控制平台集成。Spring Cloud 配置与 Git 的集成消除了解决方案的额外依赖，并使版本化应用程序配置数据成为可能。
+
+## 3.2 构建 Spring Cloud 配置服务器
+
+Maven 文件中，首先声明了要用于微服务的 Spring Boot 版本。
+
+下一个重要的 Maven 定义部分是将要使用的 Spring Cloud Config 父物料清单（Bill of Materials, BOM）。
+
+剩余部分负责声明将在服务中使用的特定 Spring Cloud 依赖项。
+
+- 第一个依赖项是所有 Spring Cloud 项目使用的 `spring-cloud-starter-config`
+- 第二个依赖项是 `spring-cloud-config-server` 起步项目，它包含了 spring-cloud-config-server 的核心库。
+
+我们仍然需要再多创建一个文件来让核心配置服务器正常运行。这个文件是位于 confsvr/src/main/resources 目录中的 application.yml 文件。application.yml 文件告诉 Spring Cloud 配置服务要侦听哪个端口以及在哪里可以找到提供配置数据的后端。
+
+在 Spring Cloud 配置中，一切都是按照层次结构进行的。应用程序配置由应用程序的名称表示。我们为需要拥有配置信息的每个环境提供一个属性文件。
+
+在构建配置服务时，它将成为在环境中运行的另一个微服务。一旦建立配置服务，服务的内容就可以通过基于 HTTP 的 REST 端点进行访问。
+
+应用程序配置文件的命名约定是“*应用程序名称-环境名称.yml*”。环境名称直接转换为可以浏览配置信息的URL（licensingservice.yml 转换为 /licensingservice/default，licensingservice-dev.yml 转换为 /licensingservice/dev）。随后，启动微服务时，要运行哪个服务环境是由在命令行服务启动时传入的 Spring Boot 的 profile 指定的。如果命令行上没有传入 profile，Spring Boot 将始终默认加载随应用程序打包的 application.yml 文件中的配置数据。
+
+### 3.2.1 创建 Spring Cloud Config 引导类
+
+~~~java
+package com.thoughtmechanix.confsvr;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.config.server.EnableConfigServer;
+
+// Spring Cloud Config 服务是 Spring Boot 应用程序，因此需要用 @SpringBoot Application 进行标记
+@SpringBootApplication
+// @EnableConfigServer 使服务成为 Spring Cloud Config 服务
+@EnableConfigServer
+public class ConfigServerApplication {
+    public static void main(String[] args) {
+        // main 方法启动服务并启动 Spring 容器
+        SpringApplication.run(ConfigServerApplication.class, args);
+    }
+}
+~~~
+
+### 3.2.2 使用带有文件系统的 Spring Cloud 配置服务器
+
+~~~yaml
+server:
+	port: 8888 # Spring Cloud 配置服务器将要监听的端口
+spring:
+	profiles:
+		active: native # 用于存储配置的后端存储库（文件系统）
+	cloud:
+		config:
+			server:
+				native:
+					searchLocations: file:///Users/johncarnell1/book/spmia-code/chapter3-code/confsvr/src/main/resources/config/licensingservice # 配置文件存储位置的路径
+~~~
+
+使用 `mvn spring-boot:run` 命令启动配置服务器。服务器现在应该在命令行上出现一个 Spring Boot 启动画面。
+
+如果用浏览器访问 http://localhost:8888/licensingservice/default，那么将会看到 JSON 净荷与 licensingservice.yml 文件中包含的所有属性一起返回。
+
+如果想要查看基于开发环境的许可证服务的配置信息，可以对 http://localhost:8888/licensingservice/dev 端点发起 GET 请求。
+
+请求特定环境的 profile 时，将返回所请求的 profile 和默认的 profile。Spring Cloud 配置返回两组配置信息的原因是，Spring 框架实现了一种用于解析属性的层次结构机制。当 Spring 框架执行属性解析时，它将始终先查找默认属性中的属性，然后用特定环境的值（如果存在）去覆盖默认属性。
+
+## 3.3 将 Spring Cloud Config 与 Spring Boot 客户端集成
+
+在下一个示例中，我们将构建许可证服务，并与持有许可证数据的 Postgres 数据库进行交流。
+
+我们将使用 Spring Data 与数据库进行通信，并将数据从许可证表映射到保存数据的 POJO。数据库连接和一条简单的属性将从 Spring Cloud 配置服务器中读出。
+
+1. **将 Spring Profile 和端点信息传递给许可证服务**：当许可证服务首次启动时，将通过命令行传递两条信息，Spring 的 profile 和许可证服务用于与 Spring Cloud 配置服务通信的端点。Spring 的 profile 值映射到为 Spring 服务检索属性的环境。
+2. **许可证服务联系 Spring Cloud 配置服务**：当许可证服务首次启动时，它将通过从 Spring 的 profile 传入构建的端点与 Spring Cloud Config 服务进行联系。
+3. **从存储库检索特定 profile 的配置信息**：然后，Spring Cloud Config 服务将会根据 URI 上传递过来的特定 Spring profile，使用已配置的后端配置存储库（文件系统、Git、Consul 或 Eureka）来检索相应的配置信息。
+4. **属性值传回给许可证服务**：然后将适当的属性值传回许可证服务。接着，Spring Boot 框架将这些值注入应用程序的相应部分。
+
+### 3.3.1 建立许可证服务对 Spring Cloud Config 服务器的依赖
+
+第一个和第二个依赖项 `spring-boot-starter-data-jpa` 和 `postgresql` 导入了 Spring Data Java Persistence API（JPA） 和 Postgres JDBC 驱动程序。最后一个依赖项是 `spring-cloud-config-client`，它包含与 Spring Cloud 配置服务器交互所需的所有类。
+
+### 3.3.2 配置许可证服务以使用 Spring Cloud Config
+
+在定义了 Maven 依赖项后，需要告知许可证服务在哪里与 Spring Cloud 配置服务器进行联系。在使用 Spring Cloud Config 的 Spring Boot 服务中，配置信息可以在 bootstrap.yml 和 application.yml 这两个配置文件之一中设置。
+
+在其他所有配置信息被使用之前，bootstrap.yml 文件要先读取应用程序属性。一般来说，bootstrap.yml 文件包含服务的应用程序名称、应用程序 profile 和连接到 Spring Cloud Config 服务器的 URI。
+
+要使许可证服务与 Spring Cloud Config 服务进行通信，需要添加一个 licensing-service/src/main/resources/bootstrap.yml 文件，并设置 3 个属性，即 `spring.application.name`、`spring.profiles.active` 和 `spring.cloud.config.uri`。
+
+~~~yaml
+spring:
+	application:
+		name: licensingservice # 指定许可证服务的名称，以便 Spring Cloud Config 客户端知道正在查找哪个服务
+	profiles:
+		active: default # 指定服务应该运行的默认 profile，profile 映射到环境
+	cloud:
+		config:
+			uri: http://localhost:8888 # 指定 Spring Cloud Config 服务器的位置
+~~~
+
+> **注意**
+>
+> Spring Boot 应用程序支持两种定义属性的机制：YAML（Yet another Markup Language）和使用“.”分隔的属性名称。我们选择 YAML 作为配置应用程序的方法。YAML 属性值的分层格式直接映射到 `spring.application.name`、`spring.profiles.active` 和 `spring.cloud.config.uri` 名称。
+
+如果要覆盖这些默认值并指向另一个环境，可以通过将许可证服务项目编译到 JAR，然后使用 -D 系统属性来运行这个 JAR 来实现。下面的命令行演示了如何使用非默认 profile 启动许可证服务：
+
+~~~sh
+java -Dspring.cloud.config.uri=http://localhost:8888 \
+-Dspring.cprofiles.active=dev \
+-jar target/licensing-service-0.0.1-SNAPSHOT.jar
+~~~
+
+> **使用环境变量传递启动信息**
+>
+> 在这些示例中，将这些值硬编码传递给 -D 参数值。在云众所需的大部分应用程序配置数据都将位于配置服务器中。但是，对于启动服务所需的信息（如配置服务器的数据），则需要启动 VM 实例或 Docker 容器并传入环境变量。
+>
+> 在由容器运行的启动脚本中，我们将这些环境变量以 -D 参数传递到启动应用程序的 JVM。在每个项目中，可以制作一个 Docker 容器，然后该 Docker 容器使用启动脚本启动该容器中的软件。
+
+### 3.3.3 使用 Spring Cloud 配置服务器连接数据源
+
+License 类是模型类，它将持有从许可证数据库检索的数据。
+
+~~~java
+package com.thoughtmechanix.licenses.model;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+// @Entity 注解告诉 Spring 这是一个 JPA 类
+@Entity
+// @Table 映射到数据库的表
+@Table(name = "licenses")
+public class License {
+    // @Id 将该字段标记为主键
+    @Id
+    // @Column 将该字段映射到特定数据库表中的列
+    @Column(name = "license_id", nullable = false)
+    private String licenseId;
+    
+    @Column(name = "organization_id", nullable = false)
+    private String organizationId;
+    
+    @Column(name = "product_name", nullable = false)
+    private String productName;
+    
+    /* 为了简介，省略了其余的代码 */
+}
+~~~
+
+Spring Data 和 JPA 框架提供访问数据库的基本 CRUD 方法。如果要构建其他方法，可以使用 Spring Data 存储库接口和基本命名约定来进行构建。Spring 将在启动时从 Repository 接口解析方法的名称，并将它们转换为基于名称的 SQL 语句，然后在幕后生成一个动态代理类来完成这项工作。
+
+~~~java
+package com.thoughtmechanix.licenses.repository;
+
+import com.thoughtmechanix.licenses.model.License;
+import org.springframework.data.repository.CrudRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+// 告诉 Spring Boot 这是一个 JPA 存储器类
+@Repository
+// 定义正在扩展 Spring CrudRepository
+public interface LicenseRepository extends CrudRepository<License, String> {
+    // 每个查询方法被 Spring 解析为 SELECT ... FROM 查询
+    public List<License> findByOrganizationId(String organizationId);
+    public License findByOrganizationIdAndLicenseId(String organizationId, String licenseId);
+}
+~~~
+
+存储库接口 `LicenseRepository` 用 `@Repository` 注解标记，这个注解告诉 Spring 应该将这个接口视为存储库并为它生成动态代理。Spring 提供不同类型的数据访问存储库。我们选择使用 Spring `CrudRepository` 基类来扩展 `LicenseRepository` 类。`CrudRepository` 基类包含基本的 CRUD 方法。除了从 `CrudRepository` 扩展的 CRUD 方法外，我们还添加了两个用于从许可表中检索数据的自定义查询方法。Spring Data 框架将拆开这些方法的名称以构建访问底层数据的查询。
+
+> **注意**
+>
+> Spring Data 框架提供各种数据库平台上的抽象层，并不仅限于关系数据库。该框架还支持 NoSQL 数据库，如 MongoDB 和 Cassandra。
+
+与第 2 章中的许可证服务不同，我们现在已将许可证服务的业务逻辑和数据访问逻辑从 `LicenseController` 中分离出来，并划分在名为 `LicenseService` 的独立服务类中。
+
+~~~java
+package com.thoughtmechanix.licenses.services;
+
+import com.thoughtmechanix.licenses.config.ServiceConfig;
+import com.thoughtmechanix.licenses.model.License;
+import com.thoughtmechanix.licenses.repository.LicenseRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+public class LicenseService {
+    @Autowired
+    private LicenseRepository licenseRepository;
+    
+    @Autowired
+    ServiceConfig config;
+    
+    public License getLicense(String organizationId, String licenseId) {
+        License license = licenseRepository.findByOrganizationIdAndLicenseId(organizationId, licenseId);
+        return license.withComment(config.getExampleProperty());
+    }
+    
+    public List<License> getLicensesByOrg(String organizationId) {
+        return licenseRepository.findByOrganizationId(organizationId);
+    }
+    
+    public void saveLicense(License license) {
+        license.withId(UUID.randomUUID().toString());
+        licenseRepository.save(license);
+    }
+    /*为了简洁，省略了其余的代码*/
+}
+~~~
+
+### 3.3.4 使用 @Value 注解直接读取属性
+
+上一节的 `LicenseService` 类中，读者可能已经注意到，在 `getLicense()` 中使用了来自 `config.getExampleProperty()` 的值来设置 `license.withComment()` 的值。
+
+如果查看 ServiceConfig.java 代码，将看到使用 @Value 注解标注的属性。
+
+~~~java
+package com.thoughtmechanix.licenses.config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+@Component
+public class ServiceConfig {
+    @Value("${example.property}")
+    private String exampleProperty;
+    
+    public String getExampleProperty() {
+        return exampleProperty;
+    }
+}
+~~~
+
+虽然 Spring Data “自动神奇地”将数据库的配置数据注入数据库连接对象中，但所有其他属性都必须使用 `@Value` 注解进行注入。
+
+> **提示**
+>
+> 虽然可以将配置的值直接注入各个类的属性中，但我发现将所有配置信息集中到一个配置类，然后将配置类注入需要它的地方是很有用的。
+
+### 3.3.5 使用 Spring Cloud 配置服务器和 Git
+
+要使用 Git，需要在配置服务的 bootstrap.yml 文件中使用代码清单所示的配置替换文件系统的配置。
+
+~~~yaml
+server:
+	port: 8888
+spring:
+	cloud:
+		config:
+			server:
+				git: # 告诉 Spring Cloud Config 使用 Git 作为后端存储库
+					# 告诉 Spring Cloud Git 服务器和 Git 存储库的 URL
+					uri: https://github.com/carnellj/config-repo/ 
+					# 告诉 Spring Cloud Config 在 Git 中查找配置文件的相对路径
+					searchPaths: licensingservice,organizationservice
+					username: native-cloud-apps
+					password: Offended
+~~~
+
+### 3.3.6 使用 Spring Cloud 配置服务器刷新属性
+
+Spring Boot Actuator 提供了一个 `@RefreshScope` 注解，允许开发团队访问 `/refresh` 端点，这会强制 Spring Boot 应用程序重新读取应用程序配置。
+
+~~~java
+package com.thoughtmechanix.licenses;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+
+@SpringBootApplication
+@RefreshScope
+public class Application {
+    public static void main(String[] args){
+        SpringApplication.run(Application.class, args);
+    }
+}
+~~~
+
+我们需要注意一些有关 `@RefreshScope` 注解的事情。首先，注解只会重新加载应用程序配置中的自定义 Spring 属性。Spring Data 使用的数据库配置等不会被 `@RefreshScope` 注解重新加载。要执行刷新，可以访问 `http://<yourserver>:8080/refresh` 端点。
+
+> **关于刷新微服务**
+>
+> 将微服务与 Spring Cloud 配置服务一起使用时，在动态更改属性之前需要考虑的一件事是，可能会有同一服务的多个实例正在运行，需要使用新的应用程序配置刷新所有这些服务。有几种方法可以解决这个问题。
+>
+> - Spring Cloud 配置服务确实提供了一种称为 Spring Cloud Bus 的“推送”机制，使 Spring Cloud 配置服务器能够向所有使用服务的客户端发布有更改发生的消息。Spring Cloud 配置需要一个额外的中间件（RabbitMQ）运行。这是检测更改的非常有用的手段，但并不是所有的 Spring Cloud 配置后端都支持这种“推送”机制（也就是 Consul 服务器）。
+> - 在下一章中，我们将使用 Spring Service Discovery 和 Eureka 来注册所有服务实例。我用过的用于处理应用程序配置刷新事件的一种技术是，刷新 Spring Cloud 配置中的应用程序属性，然后编写一个简单的脚本来查询服务发现引擎以查找服务的所有实例，并直接调用 `/refresh` 端点。
+> - 最后一种方法是重新启动所有服务器或容器来接收新的属性。这项工作很简单，特别是在 Docker 等容器服务中运行服务时。重新启动 Docker 容器差不多需要几秒，然后将强制重新读取应用配置。
+>
+> 记住，基于云的服务器是短暂的。不要害怕使用新配置启动服务的新实例，直接使用新服务，然后拆除旧的服务。
+
+## 3.4 保护敏感的配置信息
+
+Spring Cloud Config 可以让我们轻松加密敏感属性。Spring Cloud Config 支持使用对称加密（共享密钥）和非对称加密（公钥 / 私钥）。
+
+1. **下载并安装加密所需的 Oracle JCE jar**：Oracle 的不限长度的 Java 加密扩展（Unlimited Strength Java Cryptography Extension，JCE）
+2. **创建加密密钥**：使用 Spring Cloud 配置服务器，对称加密密钥是通过操作系统环境变量 `ENCRYPT_KEY` 传递给服务的字符串。对称密钥的长度应该是12个或更多个字符，最好是一个随机字符集。不要丢失对称密钥。
+3. **加密和解密属性**：在启动实例时，Spring Cloud Config 将检测到环境变量 `ENCRYPT_KEY` 已设置，并自动将两个新端点（`/encrypt` 和 `/decrypt`）添加到 Spring Cloud Config 服务。确保对两个端点进行 POST 请求。
+   Spring Cloud 配置服务器要求所有已加密的属性前面加上 `{cipher}`。`{cipher}` 告诉 Spring Cloud 配置服务器它正在处理已加密的值。
+   默认情况下，Spring Cloud Config 将在服务器上解密所有属性，并将未加密的纯文本作为结果回传给请求属性的应用程序。但是开发人员可以告诉 Spring Cloud Config 不要在服务器上进行解密，并让应用程序负责检索配置数据以解密已加密的属性。
+4. **配置微服务以在客户端使用加密**
+   1. 配置 Spring Cloud Config 的 src/main/resources/application.yml 文件中的 `spring.cloud.config.server.encrypt.enabled` 属性为 `false` 以禁用服务端的属性解密。
+   2. 在许可证服务器上设置对称密钥。
+   3. 将 `spring-security-rsa` JAR 添加到许可证服务的 pom.xml 文件中。
+
+## 3.5 最后的想法
+
+传统部署模型中，开发人员会将应用程序制品（如 JAR 或 WAR 文件）连同它的属性文件一起部署到一个“固定的”环境中。
+
+使用基于云的模型，应用程序配置数据应该与应用程序完全分离，并在运行时注入相应的配置数据，以便在所有环境中一致地提升相同的服务器和应用程序制品。
+
+# 第4章 服务发现
