@@ -684,3 +684,1442 @@ Dubbo 是阿里巴巴内部使用的一个分布式服务治理框架，于 2012
 
 ## 4.1 如何理解 Apache Dubbo
 
+Apache Dubbo 是一个分布式服务框架，主要实现多个系统之间的高性能、透明化调用，简单来说它就是一个 RPC 框架，但是和普通的 RPC 框架不同的是，它提供了服务治理功能，比如服务注册、监控、路由、容错等。
+
+促使 Apache Dubbo 框架产生的原因有两个：
+
+- 在大规模服务化之后，服务越来越多，服务消费者在调用服务提供者的服务时，需要在配置文件中维护服务提供者的 URL 地址，当服务提供者出现故障或者动态扩容时，所有相关的服务消费者都需要更新本地配置的 URL 地址，这种维护成本非常高。这个时候实现服务的上下线动态感知及服务地址的动态维护就显得非常重要。
+- 随着用户的访问量增大，后端服务为了支撑更大的访问量，会通过增加服务器来扩容。但是，哪些服务要扩容，哪些服务要缩容，需要一个判断依据，也就是说需要知道每个服务的调用量及响应时间，这个时候，就需要有一种监控手段，使用监控的数据作为容量规划的参考值，从而实现根据不同服务的访问情况来合理地调控服务器资源，提高机器的利用率。
+
+除了基本的 RPC 框架的职能，它的核心功能便是监控及服务注册。
+
+## 4.2 Apache Dubbo 实现远程通信
+
+- **dubbo:application** 用来描述提供方的应用信息，比如应用名称、维护人、版本等，其中应用名称是必填项。开发者或者运维人员可以通过监控平台查看这些信息来更快速地定位和解决问题。
+- **dubbo:registry** 配置注册中心的地址，如果不需要注册中心，可以设置为 N/A。Dubbo 支持多种注册中心，比如 ZooKeeper、Nacos 等。
+- **dubbo:protocol** 配置服务提供者的协议信息，Dubbo 支持多种协议来发布服务，默认采用 Dubbo 协议，可选的协议有很多，比如 Hessian、Webservice、Thrift 等。这意味着如果公司之间采用的协议是 Webservice，想切换到 Dubbo 上来，几乎没有太大的迁移成本。
+- **dubbo:service** 描述需要发布的服务接口，也就是这个接口可供本网络上的其他进程访问 interface 表示定义的接口， ref 表示这个接口的实现。
+
+~~~xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:dubbo="http://dubbo.apache.org/schema/dubbo"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans 
+                           http://www.springframework.org/schema/beans/spring-beans-4.3.xsd
+                           http://dubbo.apache.org/schema/dubbo
+                           http://dubbo.apache.org/schema/dubbo/dubbo.xsd">
+	<!-- 提供方应用信息，用于计算依赖关系 -->
+    <dubbo:application name="user-service"/>
+    <!-- 服务注册中心的地址，N/A 表示不注册 -->
+    <dubbo:registry address="N/A"/>
+    <!-- 用 Dubbo 协议在 20880 端口暴露服务 -->
+    <dubbo:protocol name="dubbo" port="20880"/>
+    <!-- 声明需要暴露的服务接口 -->
+    <dubbo:service interface="com.gupaoedu.book.dubbo.IUserService" ref="userService" />
+    <!-- 和本地 Bean 一样实现服务 -->
+    <bean id="userService" class="com.gupaoedu.book.dubbo.UserServiceImpl"/>
+</beans>
+~~~
+
+**dubbo:reference** 会生成一个针对当前 interface 的远程服务的代理，指向的远程服务地址是发布的 Dubbo 协议的 URL 地址。
+
+~~~xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:dubbo="http://dubbo.apache.org/schema/dubbo"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans 
+                           http://www.springframework.org/schema/beans/spring-beans-4.3.xsd
+                           http://dubbo.apache.org/schema/dubbo
+                           http://dubbo.apache.org/schema/dubbo/dubbo.xsd">
+	<!-- 提供方应用信息，用于计算依赖关系 -->
+    <dubbo:application name="order-service"/>
+    <dubbo:registry address="N/A"/>
+    <!-- 生成远程服务代理，可以和本地 Bean 一样使用 userService -->
+    <dubbo:reference id="userService" interface="com.gupaoedu.book.dubbo.IUserService"
+                     url="dubbo://192.168.13.1:20880/com.gupaoedu.book.dubbo.IUserService"/>
+</beans>
+~~~
+
+基于 XML 形式的服务发布和服务消费方式还是比较烦琐的，而且在发布的服务接口比较多的情况下，配置会非常复杂，所以 Apache Dubbo 也提供对注解的支持
+
+## 4.3 Spring Boot 集成 Apache Dubbo
+
+**服务提供者开发流程**
+
+- 创建一个普通的 Maven 工程 `springboot-provider`，并创建两个模块：`sample-api` 和 `sample-provider`，其中 `sample-provider` 模块是一个 Spring Boot 工程。
+
+- 在 sample-api 模块中定义一个接口，并且通过 `mvn install` 安装到本地私服。
+
+  ~~~java
+  public interface IHelloService {
+      String sayHello(String name);
+  }
+  ~~~
+
+- 在 sample-provider 中引入以下依赖，其中 `dubbo-spring-boot-starter` 是 Apache Dubbo 官方提供的开箱即用的组件。
+
+  ~~~xml
+  <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter</artifactId>
+  </dependency>
+  <dependency>
+  	<groupId>org.apache.dubbo</groupId>
+      <artifactId>dubbo-spring-boot-starter</artifactId>
+      <version>2.7.5</version>
+  </dependency>
+  <dependency>
+  	<groupId>com.gupaoedu.book.dubbo</groupId>
+      <version>1.0-SNAPSHOT</version>
+      <artifactId>sample-api</artifactId>
+  </dependency>
+  ~~~
+
+- 在 sample-provider 中实现 IHelloService，并且使用 Dubbo 中提供的 `@Service` 注解发布服务。
+
+  ~~~java
+  @Service
+  public class HelloServiceImpl implements IHelloService {
+      @Value("${dubbo.application.name}")
+      private String serviceName;
+      @Override
+      public String sayHello(String name) {
+          return String.format("[%s]: Hello,%s", serviceName, name);
+      }
+  }
+  ~~~
+
+- 在 application.properties 文件中添加 Dubbo 服务的配置信息，配置元素在前面的章节中讲过，只是换了一种配置形式。
+
+  ~~~properties
+  spring.application.name=springboot-dubbo-demo
+  
+  dubbo.application.name=springboot-provider
+  dubbo.protocol.name=dubbo
+  dubbo.protocol.port=20880
+  dubbo,registry.address=N/A
+  ~~~
+
+- 启动 Spring Boot，需要注意的是，需要在启动方法上添加 `@DubboComponentScan` 注解，它的作用和 Spring Framework 提供的 `@ComponentScan` 一样，只不过这里扫描的是 Dubbo 中提供的 `@Service` 注解。
+
+  ~~~java
+  @DubboComponentScan
+  @SpringBootApplication
+  public class ProviderApplication {
+      public static void main(String[] args) {
+          SpringApplication.run(ProviderApplication.class, args);
+      }
+  }
+  ~~~
+
+**服务调用者的开发流程**
+
+- 创建一个 Spring Boot 项目 `springboot-consumer`，添加 Jar 包依赖。
+
+  ~~~xml
+  <dependency>
+  	<groupId>org.apache.dubbo</groupId>
+      <artifactId>dubbo-spring-boot-starter</artifactId>
+      <version>2.7.5</version>
+  </dependency>
+  <dependency>
+      <groupId>com.gupaoedu.book.dubbo</groupId>
+      <version>1.0-SNAPSHOT</version>
+      <artifactId>sample-api</artifactId>
+  </dependency>
+  ~~~
+
+- 在 application.properties 中配置项目名称。
+
+  ~~~properties
+  dubbo.application.name=springboot-consumer
+  ~~~
+
+- 在 Spring Boot 启动类中，使用 Dubbo 提供的 `@Reference` 注解来获得一个远程代理对象。
+
+  ~~~java
+  @SpringBootApplication
+  public class SpringbootConsumerApplication {
+      @Reference(url = "dubbo://192.168.13.1:20880/com.gupaoedu.book.dubbo.IHelloService")
+      private IHelloService helloService;
+      
+      public static void main(String[] args) {
+          SpringApplication.run(SpringbootConsumerApplication.class, args);
+      }
+      @Bean
+      public ApplicationRunner runner() {
+          return args -> System.out.println(helloService.sayHello("Mic"));
+      }
+  }
+  ~~~
+
+相比基于 XML 的形式来说，基于 Dubbo-Spring-Boot-Starter 组件来使用 Dubbo 完成服务发布和服务消费会使得开发更加简单。另外，官方还提供了 Dubbo-Spring-Boot-Actuator 模块，可以实现针对 Dubbo 服务的健康检查；还可以通过 Endpoints 实现 Dubbo 服务信息的查询和控制等，为生产环境中对 Dubbo 服务的监控提供了很好的支持。
+
+## 4.4 快速上手 ZooKeeper
+
+ZooKeeper 是一个高性能的分布式协调中间件，所谓的分布式协调中间件的作用类似于多线程环境中通过并发工具包来协调线程的访问控制，只是分布式协调中间件主要解决分布式环境中各个服务进程的访问控制问题，比如访问顺序控制。所以，在这里需要强调的是，ZooKeeper 并不是注册中心，只是基于 ZooKeeper 本身的特性可以实现注册中心这个场景而已。
+
+### 4.4.2 ZooKeeper 的数据结构
+
+ZooKeeper 的数据模型和分布式文件系统类似，是一种层次化的属性结构。和文件系统不同的是，ZooKeeper 的数据是结构化存储的，并没有在物理上体现出文件和目录。
+
+ZooKeeper 树中的每个节点被称为 Znode，Znode 维护了一个 stat 状态信息，其中包含数据变化的时间和版本等。并且每个 Znode 可以设置一个 value 值，ZooKeeper 并不用于通用的数据库或者大容量的对象存储，它只是管理和协调有关的数据，所以 value 的数据大小不建议设置得非常大，较大的数据会带来更大的网络开销。
+
+ZooKeeper 上的每个节点的数据都是运行读与写的，读表示获得指定 Znode 上的 value 数据，写表示修改指定 Znode 上的 value 数据。另外，节点的创建规则和文件系统中文件的创建规则类似，必须要按照层级创建。
+
+### 4.4.3 ZooKeeper 的特性
+
+ZooKeeper 中的 Znode 在被创建的时候，需要指定节点的类型，节点类型分为：
+
+- 持久化节点，节点的数据会持久化到磁盘。
+- 临时节点，节点的生命周期和创建该节点的客户端的生命周期保持一致，一旦该客户端的会话结束，则该客户端所创建的临时节点会把自动删除。
+- 有序节点，在创建的节点后面会增加一个递增的序列，该序列在同一级父节点之下是唯一的。需要注意的是，持久化节点或者临时节点也是可以设置为有序节点的，也就是持久化有序节点或者临时有序节点。
+
+在 3.5.3 版本之后，又增加了两种节点类型，分别是：
+
+- 容器节点，当容器节点下的最后一个子节点被删除时，容器节点就会被自动删除。
+- TTL 节点，针对持久化节点或者持久化有序节点，我们可以设置一个存活时间，如果在存活时间之内该节点没有任何修改并且没有任何子节点，它就会被自动删除。
+
+需要注意的是，在同一层级目录下，节点的名称必须是唯一的，就像我们在同一个目录下不能创建两个有相同名字的文件夹一样。
+
+### 4.4.4 Watcher 机制
+
+ZooKeeper 提供了一种针对 Znode 的订阅 / 通知机制，也就是当 Znode 节点状态发生变化时或者 ZooKeeper 客户端连接状态发生变化时，会触发事件通知。这个机制在服务注册与发现中，针对服务调用者及时感知到服务提供者的变化提供了非常好的解决方案。
+
+在 ZooKeeper 提供的 Java API 中，提供了三种机制来针对 Znode 进行注册监听，分别是：
+
+- getData()，用于获取指定节点的 value 信息，并且可以注册监听，当监听的节点进行创建、修改、删除操作时，会触发相应的事件通知。
+- getChildren()，用于获取指定节点的所有子节点，并且允许注册监听，当监听节点的子节点进行创建、修改、删除操作时，触发相应的事件通知。
+- exists()，用于判断指定节点是否存在，同样可以注册针对指定节点的监听，监听的时间类型和 getData() 相同。
+
+Watcher 事件的触发都是一次性的，比如客户端通过 getData("/node", true) 注册监听，如果 /node 节点发生数据修改，那么该客户端会收到一个修改事件通知，但是 /node 再次发生变化时，客户端无法收到 Watcher 事件，为了解决这个问题，客户端必须在收到的事件回调中再次注册事件。
+
+### 4.4.5 常见应用场景分析
+
+**分布式锁**
+
+用过多线程的读者应该都知道锁，比如 synchronized 或者 Lock，它们主要用于解决多线程环境下共享资源访问的数据安全性问题，但是它们所处理的范围是线程范围的。在分布式架构中，多个进程对同一个共享资源的访问，也存在数据安全的问题，因此也需要使用锁形式来解决这类问题，而解决分布式环境下多线程对于共享资源访问带来的安全性问题的方案就是使用分布式锁。锁的本质是排他性的，也就是避免在同一时刻多个进程同时访问某一个共享资源。
+
+如果使用 ZooKeeper 实现分布式锁达到排他的目的，只需要用到节点的特性：临时节点，以及同级节点的唯一性。
+
+- 获得锁的过程
+  在获得排他锁时，所有客户端可以去 ZooKeeper 服务器上 /Exclusive_Locks 节点下创建一个临时节点 /lock。Zookeeper 基于同级节点的唯一性，会保证所有客户端中只有一个客户端能创建成功，创建成功的客户端获得了排他锁，没有获得锁的客户端就需要通过 Watcher 机制监听 /Exclusive_Locks 节点下子节点的变更事件，用于实时监听 /lock 节点的变化情况以做出反应。
+- 释放锁的过程
+  在获得锁的过程中，我们定义的锁节点 /lock 为临时节点，那么在以下两种情况下会触发锁的释放。
+  - 获得锁的客户端因为异常断开了和服务端的连接，基于临时节点的特性，/lock 节点会被自动删除。
+  - 获得锁的客户端执行完业务逻辑之后，主动删除了创建的 /lock 节点。
+
+当 /lock 节点被删除之后，ZooKeeper 服务器会通知所有监听了 /Exclusive_Locks 子节点变化的客户端。这些客户端收到通知后，再次发起创建 /lock 节点的操作来获得排他锁。
+
+**Master 选举**
+
+Master 选举是分布式系统中非常常见的场景，在分布式架构中，为了保证服务的可用性，通常会采用集群模式，也就是当其中一个机器宕机后，集群中的其他节点会接替故障节点继续工作。在这种场景中，就需要从集群中选举一个节点作为 Master 节点，剩余的节点都作为备份节点随时待命。当原有的 Master 节点出现故障之后，还需要从集群中的其他备份节点中选举一个节点作为 Master 节点继续提供服务。
+
+ZooKeeper 就可以帮助集群中的节点实现 Master 选举。具体而言，ZooKeeper 中有两种方式来实现 Master 选举这一场景：
+
+- 同一级节点不能重复创建一个已经存在的节点，这个有点类似于分布式锁的实现场景，其实 Master 选举的场景也是如此。假设集群中有 3 个节点，需要选举出 Master，那么这三个节点同时去 Zookeeper 服务器上创建一个临时节点 /master-election，由于节点的特性，只会有一个客户端创建成功，创建成功的客户端所在机器就成了 Master。同时，其他没有创建成功的客户端，针对该节点注册 Watcher 事件，用于监控当前的 Master 机器是否存活，一旦发现 Master ”挂了“，也就是 /master-election 节点被删除了，那么其他的客户端将会重新发起 Master 选举操作。
+- 利用临时有序节点的特性来实现。所有参与选举的客户端在 Zookeeper 服务器的 /master 节点下创建一个临时有序节点，编号最小的节点表示 Master，后续的节点可以监听前一个节点的删除事件，用于触发重新选举。
+
+## 4.5 Apache Dubbo 集成 ZooKeeper 实现服务注册
+
+大规模服务化之后，在远程 RPC 通信过程中，会遇到两个比较尖锐的问题：
+
+- **服务动态上下线感知**，就是服务要感知到服务提供者上下线的变化。需要一个第三方软件来统一管理服务提供者的 URL 地址，服务调用者可以从这个软件中获得目标服务的相关地址，并且第三方软件需要动态感知服务提供者状态的变化来维护所管理的 URL，进而使得服务调用者能够及时感知到变化而做出相应的处理。
+- **负载均衡**这个概念大家都熟悉，就是当服务提供者是由多个节点组成的集群环境时，服务调用者需要通过负载均衡算法来动态选择一台目标服务器进行远程通信。负载均衡的主要目的是通过多个节点的集群来均衡服务器的访问压力，提升整体性能。实现负载均衡的前提是，要得到目标服务集群的所有地址，在服务调用者进行计算，而地址的获取也同样依赖于第三方软件。
+
+第三方软件的主要功能其实就是服务注册和发现，可以看到引入服务注册中心后服务调用者和服务提供者之间的访问变化。Apache Dubbo 支持多种注册中心，比如 ZooKeeper、Nacos、Redis 等。在开源版本中，官方推荐使用的注册中心是 ZooKeeper，所以使用 Apache Dubbo 的公司大部分都用 ZooKeeper 来实现服务注册和发现，在本节中会简单介绍 ZooKeeper，后续章节会详细分析 Nacos。
+
+### 4.5.1 Apache Dubbo 集成 ZooKeeper 实现服务注册的步骤
+
+在这个案例中，只需要非常简单的几个步骤就能完成服务注册的功能：
+
+- 在 springboot-provider 项目的 sample-provider 模块中添加 ZooKeeper 相关依赖，其中 curator-framework 和 curator-recipes 是 ZooKeeper 的开源客户端。
+
+  ~~~xml
+  <dependency>
+  	<groupId>org.apache.zookeeper</groupId>
+      <artifactId>zookeeper</artifactId>
+      <version>3.5.3-beta</version>
+  </dependency>
+  <dependency>
+      <groupId>org.apache.curator</groupId>
+      <artifactId>curator-framework</artifactId>
+      <version>4.0.1</version>
+  </dependency>
+  <dependency>
+  	<groupId>org.apache.curator</groupId>
+      <artifactId>curator-recipes</artifactId>
+      <version>4.0.1</version>
+  </dependency>
+  ~~~
+
+- 修改 application.properties 文件，修改 dubbo.registry.address 的地址为 ZooKeeper 服务器的地址，表示当前 Dubbo 服务需要注册到 ZooKeeper 上。
+
+  ~~~properties
+  spring.application.name=springboot-dubbo-demo
+  
+  dubbo.application.name=springboot-provider
+  dubbo.protocol.name=dubbo
+  dubbo.protocol.port=20880
+  dubbo.registry.address=zookeeper://192.168.13.106:2181
+  ~~~
+
+- 服务调用方只需要修改 application.properties，设置 Dubbo 服务注册中心的地址即可，当 Dubbo 调用方发起远程调用时，会去注册中心获取目标服务的 URL 地址已完成最终通信。
+
+### 4.5.2 ZooKeeper 注册中心的实现原理
+
+Dubbo 服务注册到 ZooKeeper 上之后，可以在 ZooKeeper 服务器上看到如下的树形结构
+
+~~~
+/dubbo
+	┗ com.gupaoedu.book.dubbo.IHelloService
+		┣ /providers
+		┃	┣ dubbo://192.168.13.1:20880
+		┃	┗ dubbo://192.168.13.2:20880
+		┗ /consumers
+			┗ consumer://192.168.13.1:20880
+~~~
+
+当 Dubbo 服务消费者启动时，会对 /dubbo/com.gupaoedu.book.dubbo.IHelloService/providers 节点下的子节点注册 Watcher 监听，这样便可以感知到服务提供方节点的上下线变化，从而防止请求发送到已经下线的服务器造成访问失败。同时，服务消费者会在 dubbo/com.gupaoedu.book.dubbo.IHelloService/consumers 下写入自己的 URL，这样做的目的是可以在监控平台上看到某个 Dubbo 服务正在被哪些服务调用。最重要的是，Dubbo 服务的消费者如果需要调用 IHelloService 服务，那么它会先去 /dubbo/com.gupaoedu.book.dubbo.IHelloService/providers 路径下获得所有该服务的提供方 URL 列表，然后通过负载均衡算法计算出一个地址进行远程访问。
+
+整体来看，服务注册和动态感知的功能用到了 ZooKeeper 中的临时节点、持久化节点、Watcher 等，回过头看前面分析的 ZooKeeper 的应用场景可以发现，几乎所有的场景都是基于这些来完成的。另外，不得不提的是，Dubbo 还可以针对不同的情况来实现以下功能。
+
+- 基于临时节点的特性，当服务提供者宕机或者下线时，注册中心会自动删除该服务提供者的信息。
+- 注册中心重启时，Dubbo 能够自动恢复注册数据及订阅请求。
+- 为了保证节点操作的安全性，ZooKeeper 提供了 ACL 权限控制，在 Dubbo 中可以通过 dubbo.registry.username/dubbo.registry.password 设置节点的验证信息。
+- 注册中心默认的根节点是 /dubbo，如果需要针对不同环境配置不同的根节点，可以使用 dubbo.registry.group 修改根节点名称。
+
+## 4.6 实战 Dubbo Spring Cloud
+
+Spring Cloud 为 Java 环境中解决微服务问题提供了非常完整的方案，所以在最近几年时间，Spring Cloud 成了很多公司首选的技术方案。但是随着运用规模的扩大，Spring Cloud 在服务治理领域的局限性逐步显露出来。相对来说，在服务治理方面，Apache Dubbo 有着非常大的优势，并且在 Spring Cloud 出现之前，它就已经被很多公司作为服务治理及微服务基础设施的首选框架。Dubbo Spring Cloud 的出现，使得 Dubbo 既能够完全整合到 Spring Cloud 的技术栈中，享受 Spring Cloud 生态中的技术支持和标准化输出，又能够弥补 Spring Cloud 中服务治理这方面的短板。
+
+Dubbo Spring Cloud 是 Spring Cloud Alibaba 的核心组件，它构建在原生的 Spring Cloud 标准之上，不仅覆盖了 Spring Cloud 原生特性，还提供了更加稳定和成熟的实现。
+
+### 4.6.1 实现 Dubbo 服务提供方
+
+创建一个普通的 Maven 工程，并在该工程中创建两个模块：`spring-cloud-dubbo-sample-api`、`spring-cloud-dubbo-sample-provider`。其中 `spring-cloud-dubbo-sample-api` 是一个普通的 Maven 工程，`spring-cloud-dubbo-sample-provider` 是一个 Spring Boot 工程。细心的读者应该会发现，对于服务提供者而言，都会存在一个 API 声明，因为服务的调用者需要访问服务提供者声明的接口，为了确保契约的一致性，Dubbo 官方推荐的做法是把服务接口打成 Jar 包发布到仓库上。服务调用者可以依赖该 Jar 包，通过接口调用方式完成远程通信。对于服务提供者来说，也需要依赖该 Jar 包完成接口的实现。
+
+> **注意**
+>
+> 当前案例中使用的 Spring Cloud 版本为 Greenwich.SR2，Spring Cloud Alibaba 的版本为 2.2.2.RELEASE，Spring Boot 的版本为 2.1.11.RELEASE
+
+- 在 `spring-cloud-dubbo-sample-api` 中声明接口，并执行 `mvn install` 将 Jar 包安装到本地仓库。
+
+  ~~~java
+  public interface IHelloService {
+      String sayHello(String name);
+  }
+  ~~~
+
+- 在 `spring-cloud-dubbo-sample-provider` 中添加依赖。
+
+  ~~~xml
+  <dependencies>
+  	<dependency>
+      	<groupId>org.springframework.cloud</groupId>
+          <artifactId>spring-cloud-starter</artifactId>
+      </dependency>
+      <dependency>
+          <groupId>com.alibaba.cloud</groupId>
+          <artifactId>spring-cloud-starter-dubbo</artifactId>
+      </dependency>
+      <dependency>
+          <groupId>com.gupaoedu.book.springcloud</groupId>
+          <artifactId>spring-cloud-dubbo-sample-api</artifactId>
+          <version>1.0-SNAPSHOT</version>
+      </dependency>
+      <dependency>
+          <groupId>org.springframework.cloud</groupId>
+          <artifactId>spring-cloud-starter-zookeeper-discovery</artifactId>
+      </dependency>
+  </dependencies>
+  ~~~
+
+  依赖说明如下：
+
+  - spring-cloud-starter：Spring Cloud 核心包
+  - spring-cloud-dubbo-sample-api：API 接口声明
+  - spring-cloud-starter-dubbo：引入 Spring Cloud Alibaba Dubbo
+  - spring-cloud-starter-zookeeper-discovery：基于 ZooKeeper 实现服务注册发现的 artifactId
+
+  需要注意的是，上述依赖的 artifact 没有指定版本，所以需要在父 pom 中显式声明 dependencyManagement。
+
+  ~~~xml
+  <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-dependencies</artifactId>
+      <version>Greenwich.SR2</version>
+      <type>pom</type>
+      <scope>import</scope>
+  </dependency>
+  <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-dependencies</artifactId>
+      <version>2.1.11.RELEASE</version>
+      <type>pom</type>
+      <scope>import</scope>
+  </dependency>
+  <dependency>
+      <groupId>org.alibaba.cloud</groupId>
+      <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+      <version>2.1.1.RELEASE</version>
+      <type>pom</type>
+      <scope>import</scope>
+  </dependency>
+  ~~~
+
+- 在 application.properties 中配置 Dubbo 相关的信息。
+
+  ~~~properties
+  dubbo.protocol.port=20880
+  dubbo.protocol.name=dubbo
+  
+  spring.application.name=spring-cloud-dubbo-sample
+  spring.cloud.zookeeper.discovery.register=true
+  spring.cloud.zookeeper.connect-string=192.168.13.106:2181
+  ~~~
+
+  其中 `spring.cloud.zookeeper.discovery.register=true` 表示服务是否需要注册到注册中心。`spring.cloud.zookeeper.connect-string` 表示 ZooKeeper 的连接字符串。
+
+- 在启动类中声明 `@DubboComponentScan` 注解，并启动服务。
+
+  ~~~java
+  @DubboComponentScan
+  @SpringBootApplication
+  public class SpringCloudDubboSampleProviderApplication {
+      public static void main(String[] args) {
+          SpringApplication.run(SpringCloudDubboSampleProviderApplication.class, args);
+      }
+  }
+  ~~~
+
+  `@DubboComponentScan` 扫描当前注解所在的包路径下的 `@org.apache.dubbo.config.annotation.Service` 注解，实现服务的发布。发布完成之后，就可以在 ZooKeeper 服务器上看到一个 `/services/${project-name}` 节点，这个节点中保存了服务提供方相关的地址信息。
+
+### 4.6.2 实现 Dubbo 服务调用方
+
+Dubbo 服务提供方 `spring-cloud-dubbo-sample` 已经准备完毕，只需要创建一个名为 `spring-cloud-dubbo-consumer` 的 Spring Boot 项目，就可以实现 Dubbo 服务调用了。
+
+- 创建一个名为 spring-cloud-dubbo-consumer 的 Spring Boot 工程，添加与服务提供方所依赖的配置没什么区别的依赖。为了演示需要，增加了 spring-boot-starter-web 组件，表示这是一个 Web 项目。
+
+- 在 application.properties 文件中添加 Dubbo 相关配置信息。
+
+  ~~~properties
+  dubbo.cloud.subscribed-services=spring-cloud-dubbo-provider
+  
+  spring.application.name=spring-cloud-dubbo-consumer
+  spring.cloud.zookeeper.discovery.register=false
+  spring.cloud.zookeeper.connect-string=192.168.13.106:2181
+  ~~~
+
+  配置信息和 spring-cloud-dubbo-sample 项目的配置信息差不多，有两个配置需要单独说明一下：
+
+  - `spring.cloud.zookeeper.discovery.register=false` 表示当前服务不需要注册到 ZooKeeper 上，默认为 true。
+  - `dubbo.cloud-subscribed-services` 表示服务调用者订阅的服务提供方的应用名称列表，如果有多个应用名称，可以通过 “,” 分隔开，默认值为 “*”，不推荐使用默认值。当 `dubbo.cloud.subscribed-services` 为默认值时，控制台的日志中会输入一段警告信息。
+
+- 创建一个 `HelloController` 类，暴露一个 `/say` 服务，来消费 Dubbo 服务提供者的 IHelloService 服务。
+
+  ~~~java
+  @RestController
+  public class HelloController {
+      @Reference
+      private IHelloService iHelloService;
+      
+      @GetMapping("/say")
+      public String sayHello() {
+          return iHelloService.sayHello("Mic");
+      }
+  }
+  ~~~
+
+- 启动 Spring Boot 服务。
+
+  ~~~java
+  @SpringBootApplication
+  public class SpringCloudDubboConsumerApplication {
+      public static void main(String[] args) {
+          SpringApplication.run(SpringCloudDubboConsumerApplication.class, args);
+      }
+  }
+  ~~~
+
+  通过 curl 命令执行 HTTP GET 方法：
+
+  ~~~sh
+  curl http://127.0.0.1:8080/say
+  ~~~
+
+  响应结果为：
+
+  ~~~
+  [spring-cloud-dubbo-sample]: Hello,Mic
+  ~~~
+
+## 4.7 Apache Dubbo 的高级应用
+
+Apache Dubbo 更像一个生态，它提供了很多比较主流框架的集成，比如：
+
+- 支持多种协议的服务发布，默认是 dubbo://，还可以支持 rest://、webservice://、thrift:// 等。
+- 支持多种不同的注册中心，如 Nacos、ZooKeeper、Redis，未来还将会支持 Consul、Eureka、Etcd 等。
+- 支持多种序列化技术，如 avro、fst、fastjson、hessian2、kryo 等。
+
+除此之外，Apache Dubbo 在服务治理方面的功能非常完善，比如集群容错、服务路由、负载均衡、服务降级、服务限流、服务监控、安全验证等。
+
+### 4.7.1 集群容错
+
+容错就是服务容忍错误的能力。我们都知道网络通信中会存在很多不确定的因素导致请求失败，比如网络延迟、网络中断、服务异常等。当服务调用者（消费者）调用服务提供者的接口时，如果因为上述原因出现请求失败，那对于服务调用者来说，需要一种机制来应对。Dubbo 提供了集群容错的机制来优雅地处理这种错误。
+
+**容错模式**
+
+Dubbo 默认提供了 6 种容错模式，默认为 Failover Cluster。如果这 6 种容错模式不能满足你的实际需求，还可以自行扩展。这也是 Dubbo 的强大之处，几乎所有的功能都提供了插拔式的扩展。
+
+- **Failover Cluster**，失败自动切换。当服务调用失败后，会切换到集群中的其他机器进行重试，默认重试次数为2，通过属性 `retries=2` 可以修改次数，但是重试次数增加会带来更长的响应延迟。这种容错模式通常用于读操作，因为事务型操作会带来数据重复的问题。
+- **Failfast Cluster**，快速失败。当服务调用失败后，立即报错，也就是只发起一次调用。通常用于一些非幂等的写操作，比如新增数据，因为当服务调用失败时，很可能这个请求已经在服务器端处理成功，只是因为网络延迟导致响应失败，为了避免在结果不确定的情况下导致数据重复插入的问题，可以使用这种容错机制。
+- **Failsafe Cluster**，失败安全。也就是出现异常时，直接忽略异常。
+- **Failback Cluster**，失败后自动回复。服务调用出现异常时，在后台记录这条失败的请求定时重发。这种模式适合用于消息通知操作，保证这个请求一定发送成功。
+- **Forking Cluster**，并行调用集群中的多个服务，只要其中一个成功就返回。可以通过 `forks=2` 来设置最大并行数。
+- **Broadcast Cluster**，广播调用所有的服务提供者，任意一个服务报错则表示服务调用失败。这种机制通常用于通知所有的服务提供者更新缓存或者本地资源信息。
+
+**配置方式**
+
+配置方式非常简单，只需要在指定服务的 @Service 注解上增加一个参数即可。注意，在没有特殊说明的情况下，后续代码都是基于前面的 Dubbo Spring Cloud 的代码进行改造的。在 @Service 注解中增加 `cluster="failfast"` 参数，表示当前服务的容错方式为快速失败。
+
+~~~java
+@Service(cluster = "failfast")
+public class HelloServiceImpl implements IHelloService {
+    @Value("${dubbo.application.name}")
+    private String serviceName;
+    
+    @Override
+    public String sayHello(String name) {
+        return String.format("[%s]: Hello,%s", serviceName, name);
+    }
+}
+~~~
+
+在实际应用中，查询语句容错策略建议使用默认的 Failover Cluster，而增删改操作建议使用 Failfast Cluster 或者使用 Failover Cluster(retries = "0") 策略，防止出现数据重复添加等其他问题！建议在设计接口的时候把查询接口方法单独做成一个接口提供查询。
+
+### 4.7.2 负载均衡
+
+负载均衡应该不是一个陌生的概念，在访问量较大的情况下，我们会通过水平扩容的方式增加多个节点来平衡请求的流量，从而提升服务的整体性能。
+
+当服务调用者面对 5 个节点组成的服务提供方集群时，请求应该分发到集群中的哪个节点，取决于负载均衡算法，通过该算法可以让每个服务器节点获得适合自己处理能力的负载。负载均衡可以分为硬件负载均衡和软件负载均衡，硬件负载均衡比较常见的就是 F5，软件负载均衡目前比较主流的是 Nginx。
+
+在 Dubbo 中提供了 4 种负载均衡策略，默认负载均衡策略是 random。同样，如果这 4 种策略不能满足实际需求，我们可以基于 Dubbo 中的 SPI 机制来扩展。
+
+- Random LoadBalance，随机算法。可以针对性能较好的服务器设置较大的权重值，权重值较大，随机的概率也会越大。
+- RoundRobin LoadBalance，轮询。按照公约后的权重设置轮询比例。
+- LeastActive LoadBalance，最少活跃调用数。处理较慢的节点将会收到更少的请求。
+- ConsistentHash LoadBalance，一致性 Hash。相同参数的请求总是发送到同一个服务提供者。
+
+**配置方式**
+
+在 @Service 注解上增加 loadbalance 参数：
+
+~~~java
+@Service(cluster = "failfast", loadbalance = "roundrobin")
+~~~
+
+### 4.7.3 服务降级
+
+服务降级是一种系统保护策略，当服务器访问压力较大时，可以根据当前业务情况对不重要的服务进行降级，以保证核心服务的正常运行。所谓的降级，就是把一些非必要的功能在流量较大的时间端暂时关闭。
+
+降级有多个层面的分类：
+
+- 按照是否自动化可分为自动降级和人工降级。
+- 按照功能可分为读服务降级和写服务降级。
+
+人工降级一般具有一定的前置性，而自动降级更多的来自于系统出现某些异常的时候自动触发“兜底的流畅”，比如：
+
+- 故障降级，调用的远程服务“挂了”，网络故障或者 RPC 服务返回异常。这类情况在业务允许的情况下可以通过设置兜底数据响应给客户端。
+- 限流降级，不管是什么类型的系统，它所支撑的流量是有限的，为了保护系统不被压垮，在系统中会针对核心业务进行限流。当请求流量达到阈值时，后续的请求会被拦截，这类请求可以进入排队系统，也可以直接返回降级页面。
+
+Dubbo 提供了一种 Mock 配置来实现服务降级，也就是说当服务提供方出现网络异常无法访问时，客户端不抛出异常，而是通过降级配置返回兜底数据，操作步骤如下：
+
+- 在 spring-cloud-dubbo-consumer 项目中创建 MockHelloService 类，这个类只需要实现自动降级的接口即可，然后重写接口中的抽象方法实现本地数据的返回。
+
+  ~~~java
+  public class MockHelloService implements IHelloService {
+      @Override
+      public String sayHello(String s) {
+          return "Sorry, 服务无法访问，返回降级数据";
+      }
+  }
+  ~~~
+
+- 在 HelloController 类中修改 `@Reference` 注解增加 Mock 参数。其中设置了属性 `cluster = "failfast"`，因为默认的容错策略会发起两次重试，等待的时间较长。
+
+  ~~~java
+  @RestController
+  public class HelloController {
+      @Reference(mock = "com.gupaoedu.book.springcloud.springclouddubboconsumer.MockHelloService", cluster = "failfast")
+      private IHelloService iHelloService;
+      
+      @GetMapping("/say")
+      public String sayHello() {
+          return iHelloService.sayHello("Mic");
+      }
+  }
+  ~~~
+
+- 在不启动 Dubbo 服务端或者服务端的返回值超过默认的超时时间时，访问 /say 接口得到的结构就是 MockHelloService 中返回的数据。
+
+### 4.7.4 主机绑定规则
+
+主机绑定表示的是 Dubbo 服务对外发布的 IP 地址，默认情况下 Dubbo 会按照以下顺序来查找并绑定主机 IP 地址：
+
+- 查找环境变量中 DUBBO_IP_TO_BIND 属性配置的 IP 地址。
+- 查找 dubbo.protocol.host 属性配置的 IP 地址，默认是空，如果没有配置或者 IP 地址不合法，则继续往下查找。
+- 通过 LocalHost.getHostAddress 获取本地 IP 地址，如果获取失败，则继续往下查找。
+- 如果配置了注册中心的地址，则使用 Socket 通信连接到注册中心的地址后，使用 for 循环通过 socket.getLocalAddress().getHostAddress() 扫描各个网卡获取网卡 IP 地址。
+
+上述过程中，任意一个步骤检测到合法的 IP 地址，便会将其返回作为对外暴露的服务 IP 地址。需要注意的是，获取的 IP 地址并不是写入注册中心的地址，默认情况下，写入注册中心的 IP 地址优先选择环境变量中 DUBBO_IP_TO_REGISTRY 属性配置的 IP 地址。在这个属性没有配置的情况下，才会选取前面获得的 IP 地址并写入注册中心。
+
+使用默认的主机绑定规则，可能会存在获取的 IP 地址不正确的情况，导致服务消费者与注册中心上拿到的 URL 地址进行通信。因为 Dubbo 检测本地 IP 地址的策略是先调用 LocalHost.getHostAddress，这个方法的原理是通过获取本机的 hostname 映射 IP 地址，如果它指向的是一个错误的 IP 地址，那么这个错误的地址将会作为服务发布的地址注册到 ZooKeeper 节点上，虽然 Dubbo 服务能够正常启动，但是服务消费者却无法正常调用。按照 Dubbo 中 IP 地址的查找规则，如果遇到这种情况，可以使用很多种方式来解决：
+
+- 在 /etc/hosts 中配置机器名对应正确的 IP 地址映射。
+- 在环境变量中添加 DUBBO_IP_TO_BIND 或者 DUBBO_IP_TO_REGISTRY 属性，Value 值为绑定的主机地址。
+- 通过 dubbo.protocol.host 设置主机地址。
+
+除获取绑定主机 IP 地址外，对外发布的端口也是需要注意的，Dubbo 框架中针对不同的协议都提供了默认的端口号：
+
+- Dubbo 协议的默认端口号是 20880
+- Webservice 协议的默认端口号是 80
+
+在实际使用过程中，建议指定一个端口号，避免和其他 Dubbo 服务的端口产生冲突。
+
+## 4.8 Apache Dubbo 核心源码分析
+
+Apache Dubbo 的源码相对来说还是比较容易理解的，只需要理解几个点：
+
+- SPI 机制
+- 自适应扩展点
+- IoC 和 AOP
+- Dubbo 如何与 Spring 集成
+
+### 4.8.2 Dubbo 的核心之 SPI
+
+在 Dubbo 的源码中，很多地方会存下面这样三种代码，分别是自适应扩展点、指定名称的扩展点、激活扩展点：
+
+~~~java
+ExtensionLoader.getExtensionLoader(XXX.class).getAdaptiveExtension();
+ExtensionLoader.getExtensionLoader(XXX.class).getExtension(name);
+ExtensionLoader.getExtensionLoader(XXX.class).getActivateExtension(url, key);
+~~~
+
+这种扩展点实际上就是 Dubbo 中的 SPI 机制。关于 SPI，不知道大家是否还有印象，我们在分析 Spring Boot 自动装配的时候提到过 SpringFactoriesLoader，它也是一种 SPI 机制。实际上，这两者的实现思想是类似的。
+
+#### 4.8.2.1 Java SPI 扩展点实现
+
+SPI 全称是 Service Provider Interface，原本是 JDK 内置的一种服务提供发现机制，它主要用来做服务的扩展实现。SPI 机制在很多场景中都有运用，比如数据库连接，JDK 提供了 java.sql.Driver 接口，这个驱动类在 JDK 中并没有实现，而是由不同的数据库厂商来实现，比如 Oracle、MySQL 这些数据库驱动包都会实现这个接口，然后 JDK 利用 SPI 机制从 classpath 下找到相应的驱动来获得指定数据库的连接。这种插拔式的扩展加载方式，也同样遵循一定的协议协定。比如所有的扩展点必须要放在 resources/META-INF/services 目录下，SPI 机制会默认扫描这个路径下的属性文件以完成加载。
+
+- 创建一个普通的 Maven 工程 Driver，定义一个接口。这个接口只是一个规范，并没有实现，由第三方厂商来提供实现。
+
+  ~~~java
+  public interface Driver {
+      String connect();
+  }
+  ~~~
+
+- 创建另一个普通的 Maven 工程 Mysql-Driver，添加 Driver 的 Maven 依赖。
+
+- 创建 MysqlDriver，实现 Driver 接口，这个接口表示一个第三方的扩展实现。
+
+  ~~~java
+  public class MysqlDriver implements Driver {
+      @Override
+      public String connect() {
+          return "连接Mysql数据库";
+      }
+  }
+  ~~~
+
+- 在 resources/META-INF/services 目录下创建一个以 Driver 接口全路径名命名的文件 `com.gupaoedu.book.spi.Driver`，在里面填写这个 Driver 的实现类扩展。
+
+  ~~~
+  com.gupaoedu.book.spi.MysqlDriver
+  ~~~
+
+- 创建一个测试类，使用 ServiceLoader 加载对应的扩展点。从结果来看，MysqlDriver 这个扩展点被加载并且输出了相应的内容。
+
+  ~~~java
+  public class SpiMain {
+      public static void main(String[] args) {
+          ServiceLoader<Driver> serviceLoader = ServiceLoader.load(Driver.class);
+          serviceLoader.forEach(driver -> System.out.println(driver.connect()));
+      }
+  }
+  ~~~
+
+#### 4.8.2.2 Dubbo 自定义协议扩展点
+
+前面我们用 `ExtensionLoader.getExtensionLoader.getExtension()` 来演示了 Dubbo 中 SPI 的用法，下面我们基于这个方法来分析 Dubbo 源码中是如何实现 SPI 的。
+
+这段代码分为两部分：首先我们通过 ExtensionLoader.getExtensionLoader 来获得一个 ExtensionLoader 实例，然后通过 getExtension() 方法获得指定名称的扩展点。
+
+**ExtensionLoader.getExtensionLoader**
+
+这个方法用于返回一个 ExtensionLoader 实例，主要逻辑如下：
+
+- 先从缓存中获取与扩展类对应的 ExtensionLoader。
+- 如果缓存未命中，则创建一个新的实例，保存到 EXTENSION_LOADERS 集合中缓存起来。
+- 在 ExtensionLoader 构造方法中，初始化一个 objectFactory，后续会用到，暂时先不管。
+
+~~~java
+public static <T> ExtensionLoader<T> getExtensionLoader(Class<T> type) {
+    // 避免篇幅过长，省略部分代码
+    ExtensionLoader<T> loader = (ExtensionLoader<T>) EXTENSION_LOADERS.get(type);
+    if (loader == null) {
+        EXTENSION_LOADERS.putIfAbsent(type, new ExtensionLoader<T>(type));
+        loader = (ExtensionLoader<T>) EXTENSION_LOADERS.get(type);
+    }
+    return loader;
+}
+// 构造方法
+private ExtensionLoader(Class<?> type) {
+    this.type = type;
+    objectFactory = (type == ExtensionFactory.class ? null :
+                     ExtensionLoader.getExtensionLoader(ExtensionFactory.class).getAdaptiveExtension());
+}
+~~~
+
+**getExtension()**
+
+这个方法用于根据指定名称获得对应的扩展点并返回。在前面的演示案例中，如果 name 是 mysqlDriver，那么返回的实现类应该是 MysqlDriver。
+
+- name 用于参数的判断，其中，如果 `name = "true"`，则返回一个默认的扩展实现。
+- 创建一个 Holder 对象，用户缓存该扩展点的实例。
+- 如果缓存中不存在，则通过 createExtension(name) 创建一个扩展点。
+
+~~~java
+public T getExtension(String name) {
+    if (StringUtils.isEmpty(name)) {
+        throw new IllegalArgumentException("Extension name == null");
+    }
+    if ("true".equals(name)) { // 如果 name 的值
+        return getDefaultExtension();
+    }
+    // 创建或者返回一个 Holder 对象，用于缓存实例
+    final Holder<Object> holder = getOrCreateHolder(name);
+    Object instance = holder.get();
+    if (instance == null) { // 如果缓存中不存在，则创建一个实例
+        synchronized (holder) {
+            instance = holder.get();
+            if (instance == null) {
+                instance = createExtension(name);
+                holder.set(instance);
+            }
+        }
+    }
+    return (T) instance;
+}
+~~~
+
+上面这段代码非常简单，无非就是先查缓存，缓存未命中，则创建一个扩展对象。不难猜出，createExtension() 应该就是去指定的路径下查找 name 对应的扩展点的实现，并且实例化之后返回。
+
+- 通过 getExtensionClasses().get(name) 获得一个扩展类。
+- 通过反射实例化之后缓存到 EXTENSION_INSTANCES 集合中。
+- injectExtension 实现依赖注入，后面会单独讲解。
+- 把扩展类对象通过 Wrapper 进行包装。
+
+~~~java
+private T createExtension(String name) {
+    // 根据 name 返回扩展类
+    Class<?> clazz = getExtensionClasses().get(name);
+    if (clazz == null) {
+        throw findException(name);
+    }
+    try {
+        // 从缓存中查找该类是否已经被初始化
+        T instance = (T) EXTENSION_INSTANCES.get(clazz);
+        if (instance == null) {
+            EXTENSION_INSTANCES.putIfAbsent(clazz, clazz.newInstance());
+            instance = (T) EXTENSION_INSTANCES.get(clazz);
+        }
+        // 依赖注入
+        injectExtension(instance);
+        // 通过 Wrapper 进行包装
+        Set<Class<?>> wrapperClasses = cachedWrapperClasses;
+        if (CollectionUtils.isNotEmpty(wrapperClasses)) {
+            for (Class<?> wrapperClass : wrapperClasses) {
+                instance = injectExtension((T) wrapperClass.getConstructor(type).newInstance(instance));
+            }
+        }
+        initExtension(instance);
+        return instance;
+    } catch (Throwable t) {
+        throw new IllegalStateException("Extension instance (name: " + name + ", class: "
+                                        + type + ") couldn't be instantiated: " + t.getMessage(), t);
+    }
+}
+~~~
+
+在上述的代码中，第一部分是加载扩展类的关键实现，其他部分是辅助性的功能，其中依赖注入和 Wrapper 会单独来分析。我们继续来分析 getExtensionClasses().get(name) 这部分代码，核心是 getExtensionClasses，返回一个 Map 集合，Key 和 Value 分别对应配置文件中的 Key 和 Value。
+
+- 从缓存中获取已经被加载的扩展类。
+- 如果未命中缓存，则调用 loadExtensionClasses 加载扩展类。
+
+~~~java
+private Map<String, Class<?>> getExtensionClasses() {
+    Map<String, Class<?>> classes = cachedClasses.get();
+    if (classes == null) {
+        synchronized (cachedClasses) {
+            classes = cachedClasses.get();
+            if (classes == null) {
+                classes = loadExtensionClasses();
+                cachedClasses.set(classes);
+            }
+        }
+    }
+    return classes;
+}
+~~~
+
+Dubbo 中的代码实现套路基本都差不多，先访问缓存，缓存未命中再通过 loadExtensionClasses 加载扩展类，这个方法主要做两件事：
+
+- 通过 cacheDefaultExtensionName 方法获得当前扩展接口的默认扩展对象，并且缓存。
+- 调用 loadDirectory 方法加载指定文件目录下的配置文件。
+
+~~~java
+private Map<String, Class<?>> loadExtensionClasses() {
+    cacheDefaultExtensionName(); // 获得当前 type 接口默认的扩展类
+    
+    Map<String, Class<?>> extensionClasses = new HashMap<>();
+    // 解析指定路径下的文件
+    loadDirectory(extensionClasses, DUBBO_INTERNAL_DIRECTORY, type.getName(), true);
+    loadDirectory(extensionClasses, DUBBO_INTERNAL_DIRECTORY, type.getName().replace("org.apache", "com.alibaba"), true);
+    
+    loadDirectory(extensionClasses, DUBBO_DIRECTORY, type.getName());
+    loadDirectory(extensionClasses, DUBBO_DIRECTORY, type.getName().replace("org.apache", "com.alibaba"));
+    loadDirectory(extensionClasses, SERVICES_DIRECTORY, type.getName());
+    loadDirectory(extensionClasses, SERVICES_DIRECTORY, type.getName().replace("org.apache", "com.alibaba"));
+    return extensionClasses;
+}
+~~~
+
+loadDirectory 方法的逻辑比较简单，无非就是从指定的目录下，根据传入的 type 全路径名找到对应的文件，解析内容后加载并保存到 extensionClasses 集合中。cacheDefaultExtensionName 方法也比较简单，但是它和业务有一定的关系，所以单独再分析一下。
+
+- 获得指定扩展接口的 @SPI 注解
+- 得到 @SPI 注解中的名字，保存到 cachedDefaultName 属性中。
+
+~~~java
+private void cacheDefaultExtensionName() {
+    // 获得 type 类声明的注解 @SPI
+    final SPI defaultAnnotation = type.getAnnotation(SPI.class);
+    if (defaultAnnotation == null) {
+        return;
+    }
+    // 得到注解中定义的 value 值
+    String value = defaultAnnotation.value();
+    if ((value = value.trim()).length() > 0) {
+        String[] names = NAME_SEPARATOR.split(value);
+        if (name.length > 1) {
+            throw new IllegalStateException("More than 1 default extension name on extension "
+                                            + type.getName() + ": " + Arrays.toString(names));
+		}
+        if (name.length == 1) {
+            cachedDefaultName = names[0];
+        }
+    }
+}
+~~~
+
+以 Dubbo 中的 org.apache.dubbo.rpc.Protocol 接口为例，在 @SPI 注解中有一个默认值 dubbo，这意味着如果没有显式地指定协议类型，默认采用 Dubbo 协议来发布服务。
+
+~~~java
+@SPI("dubbo")
+public interface Protocol {
+    // ...
+}
+~~~
+
+这便是 Dubbo 中指定名称的扩展类加载的流程，其实并不是很复杂。
+
+在分析 createExtension 方法时，如下代码片段没有分析，这段代码的主要作用是针对扩展类进行包装。
+
+~~~java
+Set<Class<?>> wrapperClasses = cachedWrapperClasses;
+if (CollectionUtils.isNotEmpty(wrapperClasses)) {
+    for (Class<?> wrapperClass : wrapperClasses) {
+        instance = injectExtension((T) wrapperClass.getConstructor(type).newInstance(instance));
+    }
+}
+~~~
+
+这里其实用到的是装饰器模式，通过装饰器增强扩展类的功能。在分析它的源码实现之前，简单了解一下装饰器的作用。
+
+在 Dubbo 源码包中的 META-INF/dubbo/internal 目录下，找到 org.apache.dubbo.rpc.Protocol 文件，内容如下：
+
+~~~java
+filter=org.apache.dubbo.rpc.protocol.ProtocolFilterWrapper
+listener=org.apache.dubbo.rpc.protocol.ProtocolListenerWrapper
+mock=org.apache.dubbo.rpc.support.MockProtocol
+dubbo=org.apache.dubbo.rpc.support.dubbo.DubboProtocol
+injvm=org.apache.dubbo.rpc.protocol.injvm.InjvmProtocol
+rmi=org.apache.dubbo.rpc.protocol.rmi.RmiProtocol
+hessian=org.apache.dubbo.rpc.protocol.hessian.HessianProtocol
+http=org.apache.dubbo.rpc.protocol.http.HttpProtocol
+// 省略部分代码
+~~~
+
+除了基本的以 Protocol 结尾的扩展类，有两个扩展类是比较特殊的，分别是 ProtocolFilterWrapper 和 ProtocolListenerWrapper，从名字来看像装饰类。可以猜测到，它们会对当前扩展点中原有的扩展类进行包装，假设当前的扩展点是 DubboProtocol，那么实际返回的扩展类对象可能为 ProtocolFilterWrapper（ProtocolListenerWrapper（DubboProtocol））。这个功能的实现代码如下：
+
+~~~java
+Set<Class<?>> wrapperClasses = cachedWrapperClasses;
+if (CollectionUtils.isNotEmpty(wrapperClasses)) {
+    for (Class<?> wrapperClass : wrapperClasses) {
+        instance = injectExtension((T) wrapperClass.getConstructor(type).newInstance(instance));
+    }
+}
+~~~
+
+cachedWrapperClasses 集合就是当前扩展点中配置的 Wrapper 类，它是在 loadDirectory 方法中初始化的，代码路径是 loadDirectory → loadResource → loadClass。
+
+~~~java
+private void loadClass(Map<String, Class<?>> extensionClasses, java.net.URL resourceURL, Class<?> clazz, String name)
+    throws NoSuchMethodException {
+    // 省略部分代码
+    if (clazz.isAnnotationPresent(Adaptive.class)) {
+        cacheAdaptiveClass(clazz);
+    } else if (isWrapperClass(clazz)) {
+        cacheWrapperClass(clazz);
+    } else {
+        clazz.getConstructor();
+    }
+    // 省略部分代码
+}
+~~~
+
+isWrapperClass 是判断方法，如果为 true，表示当前的 clazz 是一个装饰器类。这个判断逻辑很简单，就是判断 clazz 类中是否存在一个带有扩展类的构造函数，比如 ProtocolListenerWrapper 类，就有一个带有扩展类 Protocol 参数的构造函数。
+
+~~~java
+public class ProtocolListenerWrapper implements Protocol {
+    private final Protocol protocol;
+    
+    public ProtocolListenerWrapper(Protocol protocol) {
+        if (protocol == null) {
+            throw new IllegalArgumentException("protocol == null");
+        }
+        this.protocol = protocol;
+    }
+}
+~~~
+
+得到这些装饰器类后保存到 cachedWrapperClasses 集合，然后遍历集合，通过 `wrapperClass.getConstructor(type).newInstance(instance)` 进行实例化。
+
+### 4.8.3 无处不在的自适应扩展点
+
+自适应（Adaptive）扩展点也可以理解为适配器扩展点。简单来说就是能够根据上下文动态匹配一个扩展类。它的使用方式如下：
+
+~~~java
+ExtensionLoader.getExtensionLoader(class).getAdaptiveExtension();
+~~~
+
+自适应扩展点通过 @Adaptive 注解来声明，它有两种使用方式：
+
+- @Adaptive 注解定义在类上面，表示当前类为自适应扩展类。
+
+  ~~~java
+  @Adaptive
+  public class AdaptiveCompiler implements Compiler {
+      // 省略
+  }
+  ~~~
+
+  AdaptiveCompiler 类就是自适应扩展类，通过 `ExtensionLoader.getExtensionLoader(Compiler.class).getAdaptiveExtension();` 可以返回 AdaptiveCompiler 类的实例。
+
+- @Adaptive 注解定义在方法层面，会通过动态代理的方式生成一个动态字节码，进行自适应匹配。
+
+  ~~~java
+  @SPI("dubbo")
+  public interface Protocol {
+      int getDefaultPort();
+      
+      @Adaptive
+      <T> Exporter<T> export(Invoke<T> invoker) throws RpcException;
+      
+      @Adaptive
+      <T> Invoker<T> refer(Class<T> type, URL url) throws RpcException;
+      // 省略部分代码
+  }
+  ~~~
+
+  Protocol 扩展类中的两个方法声明了 @Adaptive 注解，意味着这是一个自适应方法。在 Dubbo 源码中很多地方通过下面这行代码来获得一个自适应扩展点：
+
+  ~~~java
+  Protocol protocol = ExtensionLoader.getExtensionLoader(Protocol.class).getAdaptiveExtension();
+  ~~~
+
+  但是，在 Protocol 源码的源码中，自适应扩展点的声明在方法层面上，所以它和类级别的声明不一样。这里的 protocol 实例，是一个动态代理类，基于 javassist 动态生成的字节码来实现方法级别的自适应调用。简单来说，调用 export 方法时，会根据上下文自动匹配到某个具体的实现类的 export 方法中。
+
+接下来，基于 Protocol 的自适应扩展点方法 ExtensionLoader.getExtensionLoader(Protocol.class).getAdaptiveExtension() 来分析它的源码实现。
+
+从源码来看，getAdaptiveExtension 方法非常简单，只做了两件事：
+
+- 从缓存中获取自适应扩展点实例。
+- 如果缓存未命中，则通过 createAdaptiveExtension 创建自适应扩展点。
+
+~~~java
+public T getAdaptiveExtension() {
+    // 从缓存中获取自适应扩展点实例
+    Object instance = this.cachedAdaptiveInstance.get();
+    if (instance == null) {
+        if (this.createAdaptiveInstanceError != null) {
+            throw new IllegalStateException("Failed to create adaptive instance: " + this.createAdaptiveInstanceError.toString(), this.createAdaptiveInstanceError);
+        }
+        // 创建自适应扩展点实例，并放置到缓存中
+        synchronized(this.cachedAdaptiveInstance) {
+            instance = this.cachedAdaptiveInstance.get();
+            if (instance == null) {
+                try {
+                    instance = this.createAdaptiveExtension();
+                    this.cachedAdaptiveInstance.set(instance);
+                } catch (Throwable var5) {
+                    this.createAdaptiveInstanceError = var5;
+                    throw new IllegalStateException("Failed to create adaptive instance: " + var5.toString(), var5);
+                }
+            }
+        }
+    }
+    return instance;
+}
+~~~
+
+按照之前对于自适应扩展点的分析，可以基本上猜测出 createAdaptiveExtension 方法的实现机制，我们来看它的源码。
+
+- getAdaptiveExtensionClass 获得一个自适应扩展类的实例。
+- injectExtension 完成依赖注入。
+
+~~~java
+private T createAdaptiveExtension() {
+    try {
+        return this.injectExtension(this.getAdaptiveExtensionClass().newInstance());
+    } catch (Exception var2) {
+        throw new IllegalStateException("Can't create adaptive extension " + this.type
+                                        + ", cause: " + var2.getMessage(), var2);
+    }
+}
+~~~
+
+在这个方法中，并没有很多具体的逻辑，injectExtension 会在后面的章节来分析，我们继续看 getAdaptiveExtensionClass。
+
+- 通过 getExtensionClasses 方法加载当前传入类型的所有扩展点，缓存在一个集合中。
+- 如果 cachedAdaptiveClass 为空，则调用 createAdaptiveExtensionClass 进行创建。
+
+~~~java
+private Class<?> getAdaptiveExtensionClass() {
+    this.getExtensionClasses();
+    return this.cachedAdaptiveClass != null ? this.cachedAdaptiveClass
+        : (this.cachedAdaptiveClass = this.createAdaptiveExtensionClass());
+}
+~~~
+
+getExtensionClasses 方法在上一节中讲过，不知道大家是否还有印象，这里就不再重复分析了。如果 cachedAdaptiveClass 不为空，直接返回，这个类是什么大家应该能够猜测出来。cachedAdaptiveClass 应该是 load 在 loadDirectory 方法解析指定目录下扩展点的时候加载进来的。在加载完之后如果某个类上定义了 @Adaptive 注解，则会赋值给 cachedAdaptiveClass。
+
+这里主要关注 createAdaptiveExtensionClass 方法，它涉及动态字节码的生成和加载。
+
+- code 是一个动态拼接的类。
+- 通过 Compiler 进行动态编译。
+
+~~~java
+private Class<?> createAdaptiveExtensionClass() {
+    String code = (new AdaptiveClassCodeGenerator(this.type, this.cachedDefaultName)).generate();
+    ClassLoader classLoader = findClassLoader();
+    Compiler compiler = (Compiler)getExtensionLoader(Compiler.class).getAdaptiveExtension();
+    return compiler.compile(code, classLoader);
+}
+~~~
+
+在基于 Protocol 接口的自适应扩展点加载中，此时 code 拼接的字符串如下：
+
+~~~java
+public class Protocol$Adaptive implements Protocol {
+    // 省略部分代码
+    public Exporter export(Invoker arg0) throws org.apache.dubbo.rpc.RpcException {
+        if (arg0 == null)
+            throw new IllegalArgumentException("Invoker argument == null");
+        if (arg0.getUrl() == null)
+            throw new IllegalArgumentException("Invoker argument getUrl() == null");
+        URL url = arg0.getUrl();
+        String extName = (url.getProtocol() == null ? "dubbo" : url.getProtocol());
+        if (extName == null)
+            throw new IllegalStateException("Failed to get extension (Protocol) name from url ("
+                                            + url.toString() + ") use keys([protocol])");
+        // 根据名称获得指定扩展点
+        Protocol extension = ExtensionLoader.getExtensionLoader(Protocol.class).getExtension(extName);
+        return extension.export(arg0);
+    }
+    
+    public Invoker refer(Class arg0, URL arg1) throws RpcException {
+        if (arg1 == null)
+            throw new IllegalArgumentException("url == null");
+        URL url = arg1;
+        String extName = (url.getProtocol() == null ? "dubbo" : url.getProtocol());
+        if (extName = null)
+            throw new IllegalStateException("Failed to get extension (Protocol) name from url ("
+                                            + url.toString() + ") use keys([protocol])");
+        Protocol extension = ExtensionLoader.getExtensionLoader(Protocol.class).getExtension(extName);
+        return extension.refer(arg0, arg1);
+    }
+}
+~~~
+
+Protocol$Adaptive 是一个动态生成的自适应扩展类，可以按照下面这种方式使用：
+
+~~~java
+Protocol protocol = ExtensionLoader.getExtensionLoader(Protocol.class).getAdaptiveExtension();
+protocol.export(...);
+~~~
+
+当调用 protocol.export() 时，实际上会调用 Protocol$Adaptive 类中的 export 方法。而这个方法，无非就是根据 Dubbo 服务配置的协议名称，通过 getExtension 获得相应的扩展类。
+
+~~~java
+public Exporter export(Invoker arg0) throws org.apache.dubbo.rpc.RpcException {
+    URL url = arg0.getUrl();
+    String extName = (url.getProtocol() == null ? "dubbo" : url.getProtocol());
+    Protocol extension = ExtensionLoader.getExtensionLoader(Protocol.class).getExtension(extName);
+    return extension.export(arg0);
+}
+~~~
+
+所以，整体来看 Protocol$Adaptive 其实就是一种适配器模式，根据上下文信息自动适配到相应的协议扩展点来完成服务的发布。
+
+### 4.8.4 Dubbo 中的 IoC 和 AOP
+
+IoC（控制反转）和 AOP（面向切面）我们并不陌生，它是 Spring Framework 中的核心功能。实际上 Dubbo 中也用到了这两种机制。下面从源码层面逐个来分析这两种机制的体现。
+
+#### 4.8.4.1 IoC
+
+IoC 中一个非常重要的思想是，在系统运行时，动态地向某个对象提供它所需要的其他对象，这种机制是通过 Dependency Injection（依赖注入）来实现的。
+
+在分析 Dubbo SPI 机制时，createExtension 方法中有一段代码如下：
+
+~~~java
+private T createExtension(String name) {
+    // 省略部分代码
+    try {
+        T instance = (T) EXTENSION_INSTANCES.get(clazz);
+        if (instance == null) {
+            EXTENSION_INSTANCES.putIfAbsent(clazz, clazz.newInstance());
+            instance = (T) EXTENSION_INSTANCES.get(clazz);
+        }
+        injectExtension(intance);
+        // 省略部分代码
+        return instance;
+    } catch (Throwable t) {
+        // 省略部分代码
+    }
+}
+~~~
+
+injectExtension 就是依赖注入的实现，整体逻辑比较简单：
+
+- 遍历被加载的扩展类中所有的 set 方法。
+- 得到 set 方法中的参数类型，如果参数类型是对象类型，则获得这个 set 方法中的属性名称。
+- 使用自适应扩展点加载该属性名称对应的扩展类。
+- 调用 set 方法完成赋值。
+
+~~~java
+private T injectExtension(T instance) {
+    if (objectFactory == null) {
+        return instance;
+    }
+    
+    try {
+        for (Method method : instance.getClass().getMethods()) {
+            if (!isSetter(method)) {
+                continue;
+            }
+            if (method.getAnnotation(DisableInject.class) != null) {
+                continue;
+            }
+            // 获得扩展类中方法的参数类型
+            Class<?> pt = method.getParameterTypes()[0];
+            // 如果不是对象类型，则跳过
+            if (ReflectUtils.isPrimitives(pt)) {
+                continue;
+            }
+            try {
+                // 获得方法对应的属性名称
+                String property = getSetterProperty(method);
+                // 根据 class 及 name，使用自适应扩展点加载并且通过 set 方法进行赋值
+                Object object = objectFactory.getExtension(pt, property);
+                if (object != null) {
+                    method.invoke(instance, object);
+                }
+            } catch (Exception e) {
+                logger.error("Failed to inject via method " + method.getName()
+                            + " of interface " + type.getName() + ": " + e.getMessage(), e);
+            }
+        }
+    } catch (Exception e) {
+        logger.error(e.getMessage(), e);
+    }
+    return instance;
+}
+~~~
+
+简单来说，injectExtension 方法的主要功能就是，如果当前加载的扩展类存在一个成员对象，并且为它提供了 set 方法，那么就会通过自适应扩展点进行加载并赋值。以 org.apache.dubbo.registry.integration.RegistryProtocol 类为例，它里面有一个 Protocol 成员对象，并且为它提供了 setProtocol 方法，那么当 RegistryProtocol 扩展类被加载时，就会自动注入 protocol 成员属性的实例。
+
+~~~java
+public class RegistryProtocol implements Protocol {
+    // 省略部分代码
+    private Protocol protocol;
+    
+    public void setProtocol(Protocol protocol) {
+        this.protocol = protocol;
+    }
+    // 省略部分代码
+}
+~~~
+
+#### 4.8.4.2 AOP
+
+AOP 全称为 Aspect Oriented Programming，意思是面向切面编程，它是一种思想或者编程范式。它的主要意图是把业务逻辑和功能逻辑分离，然后在运行期间或者类加载期间进行织入。这样做的好处是，可以降低代码的复杂性，以及提高重用性。
+
+在 Dubbo SPI 机制中，同样在 ExtensionLoader 类中的 createExtension 方法中体现了 AOP 的设计思想。
+
+~~~java
+private T createExtension(String name) {
+    // ...
+    try {
+        // ...
+        Set<Class<?>> wrapperClasses = cachedWrapperClasses;
+        if (CollectionUtils.isNotEmpty(wrapperClasses)) {
+            for (Class<?> wrapperClass : wrapperClasses) {
+                instance = injectExtension((T) wrapperClass.getConstructor(type).newInstance(instance));
+            }
+        }
+        initExtension(instance);
+        return instance;
+    } catch (Throwable t) {
+        // ...
+    }
+}
+~~~
+
+这段代码在前面的章节中讲过，仔细分析一下下面这行代码：
+
+~~~java
+instance = injectExtension((T) wrapperClass.getConstructor(type).newInstance(instance));
+~~~
+
+其中分别用到了依赖注入和 AOP 思想，AOP 思想的体现是基于 Wrapper 装饰器类实现对原有扩展类 instance 进行包装。
+
+### 4.8.5 Dubbo 和 Spring 完美集成的原理
+
+使用 Dubbo 最方便的地方在于，它和 Spring 能够非常方便地集成，在享受这种便利的同时，难免会思考并挖掘它的实现原理。实际上，Dubbo 对于配置的优化，也是随着 Spring 一同发展的，从最早的 XML 形式到后来的注解方式及自动装配，都是在不断地简化开发过程以提升开发效率。
+
+在 Spring Boot 集成 Dubbo 这个案例中，服务发布主要有以下几个步骤：
+
+- 添加 dubbo-spring-boot-starter 依赖。
+- 定义 @org.apache.dubbo.config.annotation.Service 注解。
+- 声明 @DubboComponentScan，用于扫描 @Service 注解。
+
+基于前面的分析，其实不难猜出它的实现原理。@Service 与 Spring 中的 @org.springframework.stereotype.Service，用于实现 Dubbo 服务的暴露。与它相对应的是 @Reference，它的作用类似于 Spring 中的 @Autowired。
+
+而 @DubboComponentScan 和 Spring 中的 @ComponentScan 作用类似，用于扫描 @Service、@Reference 等注解。下面我们通过源码逐步分析它的实现机制。
+
+#### 4.8.5.1 @DubboComponentScan 注解解析
+
+DubboComponentScan 注解的定义如下，这个注解主要通过 @Import 导入一个 DubboComponentScanRegistrar 类。
+
+~~~java
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Import(DubboComponentScanRegistrar.class)
+public @interface DubboComponentScan {
+    String[] value() default {};
+    
+    String[] basePackages() default {};
+    
+    Class<?>[] basePackageClasses() default {};
+}
+~~~
+
+DubboComponentScanRegistrar 实现了 ImportBeanDefinitionRegistrar 接口，并且重写了 registerBeanDefinition 方法。
+
+- 获取扫描包的路径，在默认情况下扫描当前配置类所在的包。
+- 注册 @Service 注解的解析类。
+- 注册 @Reference 注解的解析类。
+
+~~~java
+public class DubboComponentScanRegistrar implements ImportBeanDefinitionRegisterar {
+    @Override
+    public void registerBeanDefinitions(AnnotationMetadata importingClassMetaData, BeanDefinitionRegistry registry) {
+        // 获取扫描包的路径
+        Set<String> packagesToScan = getPackagesToScan(importingClassMetadata);
+        // 注册 @Service 的解析类
+        registerServiceAnnotationBeanPostProcessor(packagesToScan, registry);
+        // 注册 @Reference 的解析类
+        registerReferenceAnnotationBeanPostProcessor(registry);
+    }
+    // ...
+}
+~~~
+
+ImportBeanDefinitionRegistrar 是 Spring 提供的一种动态注入 Bean 的机制，和前面章节中讲过的 ImportSelector 接口的功能类似。在 registerBeanDefinitions 方法中，主要会实例化一些 BeanDefinition 注入 Spring IoC 容器。
+
+继续看 registerServiceAnnotationBeanPostProcessor 方法，逻辑很简单，就是把 ServiceAnnotationBeanPostProcessor 注册到容器。
+
+~~~java
+private void registerServiceAnnotationBeanPostProcessor(Set<String> packagesToScan, BeanDefinitionRegistry registry) {
+    // 构建 ServiceAnnotationBeanPostProcessor 的 BeanDefinitionBuilder
+    BeanDefinitionBuilder builder = rootBeanDefinition(ServiceAnnotationBeanPostProcessor.class);
+    builder.addConstructorArgValue(packagesToScan);
+    builder.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
+    AbstractBeanDefinition beanDefinition = builder.getBeanDefinition();
+    // 将 beanDefinition 注册到 IoC 容器
+    BeanDefinitionReaderUtils.registerWithGeneratedName(beanDefinition, registry);
+}
+~~~
+
+总的来看，@DubboComponentScan 只是注入一个 ServiceAnnotationBeanPostProcessor（用于解析 @Service） 和一个 ReferenceAnnotationBeanPostProcessor （用于解析 @Reference）对象。
+
+#### 4.8.5.2 ServiceAnnotationBeanPostProcessor
+
+ServiceAnnotationBeanPostProcessor 类的定义如下，在 org.apache.dubbo.config.spring.beans.factory.annotation 包路径下，核心逻辑是解析 @Service 注解。
+
+~~~java
+public class ServiceAnnotationBeanPostProcessor
+    implements BeanDefinitionRegistryPostProcessor, EnvironmentAware, ResourceLoaderAware, BeanClassLoaderAware {}
+~~~
+
+BeanDefinitionRegistryPostProcessor 接口继承自 BeanFactoryPostProcessor，是一种比较特殊的 BeanFactoryPostProcessor。BeanDefinitionRegistryPostProcessor 中定义的 postProcessBeanDefinitionRegistry 方法可以让我们实现自定义的 Bean 定义的逻辑。
+
+下面具体分析 postProcessBeanDefinitionRegistry 方法，主要逻辑是：
+
+- 调用 registerBeans 注册 DubboBootstrapApplicationListener 类。
+- 通过 resolvePackagesToScan 对 packagesToScan 参数进行去空格处理，并把配置文件中配置的扫描参数也一起处理一下。
+- 调用 registerServiceBeans 完成 Bean 的注册。
+
+~~~java
+public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) throws BeansException {
+    // @since 2.7.5
+    registerBeans(registry, DubboBootstrapApplicationListener.class);
+    Set<String> resolvedPackagesToScan = resolvePackagesToScan(packagesToScan);
+    if (!CollectionUtils.isEmpty(resolvedPackagesToScan)) {
+        registerServiceBeans(resolvedPackagesToScan, registry);
+    } else {
+        if (logger.isWarnEnabled()) {
+            logger.warn("packagesToScan is empty, ServiceBean registry will be ignored!");
+        }
+    }
+}
+~~~
+
+核心逻辑在 registerServiceBeans 方法中，这个方法会查找需要扫描的指定包里面有 @Service 注解的类并注册成 Bean。
+
+- 定义 DubboClassPathBeanDefinitionScanner 扫描对象，扫描指定路径下的类，将符合条件的类装配到 IoC 容器。
+- BeanNameGenerator 是 Beans 体系中比较重要的一个组件，会通过一定的算法计算出需要装配的 Bean 的 name。
+- addIncludeFilter 设置 Scan 的过滤条件，只扫描 @Service 注解修饰的类。
+- 遍历指定的包。通过 findServiceBeanDefinitionHolders 查找 @Service 注解修饰的类。
+- 通过 registerServiceBean 完成 Bean 的注册。
+
+~~~java
+private void registerServiceBeans(Set<String> packagesToScan, BeanDefinitionRegistry registry) {
+    // 定义扫描对象
+    DubboClassPathBeanDefinitionScanner scanner =
+        new DubboClassPathBeanDefinitionScanner(registry, environment, resourceLoader);
+    // beanName 解析器
+    BeanNameGenerator beanNameGenerator = resolveBeanNameGenerator(registry);
+    scanner.setBeanNameGenerator(beanNameGenerator);
+    // 添加过滤器，用于过滤 @Service 注解修饰的对象
+    scanner.addIncludeFilter(new AnnotationTypeFilter(Service.class));
+    scanner.addIncludeFilter(new AnnotationTypeFilter(com.alibaba.dubbo.config.annotation.Service.class));
+    for (String packageToScan : packagesToScan) {
+        scanner.scan(packageToScan);
+        // 查找 @Service 修饰的类
+        Set<BeanDefinitionHolder> beanDefinitionHolders =
+            findServiceBeanDefinitionHolders(scanner, packageToScan, registry, beanNameGenerator);
+        if (!CollectionUtils.isEmpty(beanDefinitionHolders)) {
+            for (BeanDefinitionHolder beanDefinitionHolder : beanDefinitionHolders) {
+                // 注册 Bean
+                registerServiceBean(beanDefinitionHolder, registry, scanner);
+            }
+        }
+        // 省略部分代码
+    }
+}
+~~~
+
+这段代码其实也比较简单，主要作用就是通过扫描指定路径下添加了 @Service 注解的类，通过 registryServiceBean 来注册 ServiceBean。整体来看，Dubbo 的注解扫描进行服务发布的过程，实际上就是基于 Spring 的扩展。
+
+继续来分析 registerServiceBean 方法，这里的 ServiceBean 是指 org.apache.dubbo.config.spring.ServiceBean。
+
+- resolveClass 获取 BeanDefinitionHolder 中的 Bean。
+- findServiceAnnotation 方法会从 beanClass 类中找到 @Service 注解。
+- getAnnotationAttributes 获得注解中的属性，比如 loadbalance、cluster 等。
+- resolveServiceInterfaceClass 用于获得 beanClass 对应的接口定义，这里要注意的是，在 `@Service(interfaceClass = IHelloService.class)` 注解中也可以声明 interfaceClass，注解中声明的优先级最高，如果没有声明该属性，则会从父类中查找。
+- annotatedServiceBeanName 代表 Bean 的名称。
+- 从名字可以看出，buildServiceBeanDefinition 用来构造 org.apache.dubbo.config.spring.ServiceBean 对象。每个 Dubbo 服务的发布最终都会出现一个 ServiceBean。
+- 调用 registerBeanDefinition 将 ServiceBean 注入 Spring IoC 容器。
+
+~~~java
+private void registerServiceBean(BeanDefinitionHolder beanDefinitionHolder,
+                                 BeanDefinitionRegistry registry,
+                                 DubboClassPathBeanDefinitionScanner scanner) {
+    // 获得需要发布的服务类
+    Class<?> beanClass = resolveClass(beanDefinitionHolder);
+    // 得到该服务类上的注解
+    Annotation service = findServiceAnnotation(beanClass);
+    // 获得注解中的属性
+    AnnotationAttributes serviceAnnotationAttributes = getAnnotationAttributes(service, false, false);
+    // 获得服务类的接口声明
+    Class<?> interfaceClass = resolveServiceInterfaceClass(serviceAnnotationAttributes, beanClass);
+    
+    String annotatedServiceBeanName = beanDefinitionHolder.getBeanName();
+    // 构造 ServiceBean
+    AbstractBeanDefinition serviceBeanDefinition =
+        buildServiceBeanDefinition(service, serviceAnnotationAttributes, interfaceClass, annotatedServiceBeanName);
+    // 生成 ServiceBean 的 beanName
+    String beanName = generateServiceBeanName(serviceAnnotationAttributes, interfaceClass);
+    // check duplicated candidate bean
+    if (scanner.checkCandidate(beanName, serviceBeanDefinition)) {
+        // 完成注册
+        registry.registerBeanDefinition(beanName, serviceBeanDefinition);
+        // 省略部分代码
+    }
+}
+~~~
+
+从整个代码分析来看，在 registerServiceBean 方法中主要是把一个 ServiceBean 注入 Spring IoC 容器中。读者看到这里可能会有点晕，以如下代码为例：
+
+~~~java
+@Service
+public class HelloServiceImpl implements IHelloService {
+}
+~~~
+
+它并不是像普通的 Bean 注入一样直接将 HelloServiceImpl 对象的实例注入容器，而是注入一个 ServiceBean 对象。对于 HelloServiceImpl 来说，它并不需要把自己注入 Spring IoC 容器，而是需要把自己发布到网络上，提供给网络上的服务消费者来访问。那么它是怎么发布到网络上的呢？
+
+不知道大家是否还记得前面分析 postProcessBeanDefinitionRegistry 方法的时候，有一个 registryBeans 方法，它注册了一个 DubboBootstrapApplicationListener 事件监听 Bean。
+
+~~~java
+public class DubboBootstrapApplicationListener
+    extends OneTimeExecutionApplicationContextEventListener implements Ordered {
+    private final DubboBootstrap dubboBootstrap;
+    public DubboBootstrapApplicationListener() {
+        this.dubboBootstrap = DubboBootstrap.getInstance();
+    }
+    @Override
+    public void onApplicationContextEvent(ApplicationContextEvent event) {
+        if (event instanceof ContextReferencedEvent) {
+            onContextRefreshedEvent((ContextReferencedEvent) event);
+        } else if (event instanceof ContextClosedEvent) {
+            onContextClosedEvent((ContextClosedEvent) event);
+        }
+    }
+    private void onContextRefreshedEvent(ContextRefreshedEvent event) {
+        dubboBootstrap.start();
+    }
+    // 省略
+}
+~~~
+
+当所有的 Bean 都处理完成之后，Spring IoC 会发布一个事件，事件类型为 ContextRefreshedEvent，当触发这个事件时，会调用 onContextRefreshedEvent 方法。在这个方法中，可以看到 Dubbo 服务启动的触发机制 `dubboBootstrap.start()`。“一路跟进下去”，便可以进入 org.apache.dubbo.config.ServiceConfig 类中的 export() 方法，这个方法启动一个网络监听，从而实现服务发布。
+
+# 第5章 服务注册与发现
+
