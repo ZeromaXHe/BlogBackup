@@ -2123,3 +2123,278 @@ public class DubboBootstrapApplicationListener
 
 # 第5章 服务注册与发现
 
+服务消费者要去调用多个服务提供者组成的集群。首先，服务消费者需要在本地配置文件中维护服务提供者集群的每个节点的请求地址。其次，服务提供者集群中如果某个节点下线或者宕机，服务消费者的本地配置中需要同步删除这个节点的请求地址，防止请求发送到已宕机的节点下线或者宕机，服务消费者的本地配置中需要同步删除这个节点的请求地址，防止请求发送到已宕机的节点上造成请求失败。为了解决这类的问题，就需要引入服务注册中心，它主要有以下功能：
+
+- 服务地址的管理
+- 服务注册
+- 服务动态感知
+
+## 5.1 什么是 Alibaba Nacos
+
+Nacos 致力于解决微服务中的统一配置、服务注册与发现等问题。它提供了一组简单易用的特性集，帮助开发者快速实现动态服务发现、服务配置、服务元数据及流量管理及流量管理。
+
+Nacos 的关键特性如下。
+
+### 服务发现和服务健康监测
+
+Nacos 支持基于 DNS 和基于 RPC 的服务发现。服务提供者使用原生 SDK、OpenAPI 或一个独立的 Agent TODO 注册 Service 后，服务消费者可以使用 DNS 或 HTTP & API 查找和发现服务。
+
+Nacos 提供对服务的实时的健康检查，阻止向不健康的主机或服务实例发送请求。Nacos 支持传输层（PING 或 TCP）和应用层（如 HTTP、MySQL、用户自定义）的健康检查。对于复杂的云环境和网络拓扑环境中（如 VPC、边缘网络等）服务的健康检查，Nacos 提供了 agent 上报和服务端主动检测两种健康检查模式。Nacos 还提供了统一的健康检查仪表盘，帮助用户根据健康状态管理服务的可用性及流量。
+
+### 动态配置服务
+
+业务服务一般都会维护一个本地配置文件，然后会把一些常量配置到这个文件中。这种方式在某些场景中会存在问题，比如配置需要变更时要重新部署应用。而动态配置服务可以以中心化、外部化和动态化的方式管理所有环境的应用配置和服务配置，可以使配置管理变得更加高效和敏捷。配置中心化管理让实现无状态服务变得更简单，让服务按需弹性扩展变得更容易。
+
+另外，Nacos 提供了一个简洁易用的 UI（控制台样例 Demo）帮助用户管理所有服务和应用的配置。Nacos 还提供了包括配置版本跟踪、金丝雀发布、一键回滚配置及客户端配置更新状态跟踪在内的一系列开箱即用的配置管理特性，帮助用户更安全地在生产环境中管理配置变更，降低配置变更带来的风险。
+
+### 动态 DNS 服务
+
+动态 DNS 服务支持权重路由，让开发者更容易地实现中间层负载均衡、更灵活的路由策略、流量控制，以及数据中心内网的简单 DNS 解析服务。
+
+### 服务及其元数据管理
+
+Nacos 可以使开发者从微服务平台建设的视角管理数据中心的所有服务及元数据，包括管理服务的描述、生命周期、服务的静态依赖分析、服务的健康状态、服务的流量管理、路由及安全策略、服务的 SLA 及最重要的 metrics 统计数据。
+
+## 5.2 Nacos 的基本使用
+
+### 5.2.1 Nacos 的安装
+
+Nacos 支持三种部署模式，分别是单机、集群和多集群。需要注意的是，Nacos 依赖 Java 环境，并且要求使用 JDK 1.8 以上版本。
+
+### 5.2.2 Nacos 服务发现注册相关 API 说明
+
+Nacos 提供了 SDK 及 Open API 的方式来完成服务注册和发现等操作，由于服务端只提供了 REST 接口，所以 SDK 本质上是对于 HTTP 请求的封装。下面简单列一下和服务注册相关的核心接口。
+
+#### 注册实例
+
+将服务地址信息注册到 Nacos Server：
+
+```java
+Open API: /nacos/v1/ns/instance (POST)
+SDK:
+void registerInstance(String serviceName, String ip, int port) throws NacosException;
+void registerInstance(String serviceName, String ip, int port, String clusterName) throws NacosException;
+void registerInstance(String serviceName, Instance instance) throws NacosException;
+```
+
+参数说明如下。
+
+- serviceName：服务名称。
+- ip：服务实例 IP。
+- port：服务实例 Port。
+- clusterName：集群名称，表示该服务实例属于哪个集群。
+- instance：实例属性，实际上就是把上面这些参数封装成一个对象。
+
+调用方式：
+
+```java
+NamingService naming = NamingFactory.createNamingService(System.getProperty("serveAddr"));
+naming.registerInstance("nacos_test", "192.168.1.1", 8080, "DEFAULT");
+```
+
+#### 获取全部实例
+
+根据服务名称从 Nacos Server 上获取所有服务实例：
+
+```java
+Open API: /nacos/v1/ns/instance/list (GET)
+SDK:
+List<Instance> getAllInstance(String serviceName) throws NacosException;
+List<Instance> getAllInstance(String serviceName, List<String> clusters) throws NacosException;
+```
+
+参数说明如下：
+
+- serviceName：服务名称
+- cluster：集群列表，可以传递多个值。
+
+调用方式：
+
+```java
+NamingService naming = NamingFactory.createNamingService(System.getProperty("serveAddr"));
+System.out.println(naming.getAllInstances("nacos_test", true));
+```
+
+#### 监听服务
+
+监听服务是指监听指定服务下的实例变化。在前面的分析中我们知道，客户端从 Nacos Server 上获取的实例必须是健康的，否则会造成客户端请求失败。监听服务机制可以让客户端及时感知服务提供者实例的变化。
+
+```java
+Open API: /nacos/v1/ns/instance/list (GET)
+SDK:
+void subscribe(String serviceName, EventListener listener) throws NacosException;
+void subscribe(String serviceName, List<String> clusters, EventListener listener) throws NacosException;
+```
+
+参数说明如下：
+
+- EventListener：当服务提供者实例发生上、下线时，会触发一个事件回调。
+
+需要注意的是，监听服务的 Open API 也访问 /nacos/v1/ns/instance/list，具体的原理会在源码分析中讲解。
+
+服务监听有两种方式：
+
+- 第一种是客户端调用 /nacos/v1/ns/instance/list 定时轮询。
+- 第二种是基于 DatagramSocket 的 UDP 协议，实现服务端的主动推送。
+
+### 5.2.3 Nacos 集成 Spring Boot 实现服务注册与发现
+
+本节通过 Spring Boot 集成 Nacos 实现一个简单的服务注册与发现功能。
+
+- 创建一个 Spring Boot 工程 spring。
+
+- 添加 Maven 依赖。
+
+  ```xml
+  <dependency>
+      <groupId>com.alibaba.boot</groupId>
+      <artifactId>nacos-discovery-spring-boot-starter</artifactId>
+      <version>0.2.4</version>
+  </dependency>
+  ```
+
+- 创建 DiscoveryController 类，通过 `@NacosInjected` 注入 Nacos 的 NamingService，并提供 discovery 方法，可以根据服务名称获得注册到 Nacos 上的服务地址。
+
+  ```java
+  @RestController
+  public class DiscoveryController {
+      @NacosInjected
+      private NamingService namingService;
+      
+      @GetMapping("/discovery")
+      public List<Instance> discovery(@RequestParam String serviceName) throws NacosException {
+          return namingService.getAllInstances(serviceName);
+      }
+  }
+  ```
+
+- 在 application.properties 中添加 Nacos 服务地址的配置。
+
+  ```properties
+  nacos.discovery.server-addr=127.0.0.1:8848
+  ```
+
+- 启动 SpringBootNacosDiscoveryApplication，调用 `curl http://127.0.0.1:8080/discovery?serviceName=example` 去 Nacos 服务器上查询服务名称 example 所对应的地址信息，此时由于 Nacos Server 并没有 example 的服务实例，返回一个空的 JSON 数组[]。
+
+- 接着，通过 Nacos 提供的 Open API，向 Nacos Server 注册一个名字为 example 的服务。
+
+  ```sh
+  curl -X PUT 'http://127.0.0.1:8848/nacos/v1/ns/instance?serviceName=example&ip=127.0.0.1&port=8080'
+  ```
+
+- 再次访问 `curl http://127.0.0.1:8080/discovery?serviceName=example`，将返回以下信息。
+
+  ```json
+  [
+      {
+          instanceId: "127.0.0.1#8080#DEFAULT#DEFAULT_GROUP@@example",
+          ip: "127.0.0.1",
+          port: 8080,
+          weight: 1,
+          healthy: true,
+          enabled: true,
+          ephemeral: true,
+          clusterName: "DEFAULT",
+          serviceName: "DEFAULT_GROUP@@example",
+          metadata: {},
+          instanceHeartBeatInterval: 5000,
+          instanceIdGenerator: "simple",
+          instanceHeartBeatTimeOut: 15000,
+          ipDeleteTimeout: 30000
+      }
+  ]
+  ```
+
+## 5.3 Nacos 的高可用部署
+
+在分布式架构中，任何中间件或者应用都不允许单点存在，所以开源组件一般都会自己支持高可用集群解决方案。Nacos 提供了类似于 ZooKeeper 的集群架构，包含一个 Leader 节点和多个 Follower 节点。和 ZooKeeper 不同的是，它的数据一致性算法采用的是 Raft，同样采用了该算法的中间件有 Redis Sentinel 的 Leader 选举、Etcd 等。
+
+## 5.4 Dubbo 使用 Nacos 实现注册中心
+
+Dubbo 可以支持多种注册中心，比如在前面章节中讲的 ZooKeeper，以及 Consul、Nacos 等。本节主要讲解如何使用 Nacos 作为 Dubbo 服务的注册中心，为 Dubbo 提供服务注册与发现的功能，实现步骤如下。
+
+- 创建一个普通 Maven 项目 spring-boot-dubbo-nacos-sample，添加两个模块：nacos-sample-api 和 nacos-sample-provider。其中，nacos-sample-provider 是一个 Spring Boot 工程。
+
+- 在 nacos-sample-api 中声明接口
+
+  ```java
+  public interface IHelloService {
+      String sayHello(String name);
+  }
+  ```
+
+- 在 nacos-sample-provider 中添加依赖。
+
+  ```xml
+  <dependency>
+      <groupId>com.gupaoedu.book.nacos</groupId>
+      <version>1.0-SNAPSHOT</version>
+      <artifactId>nacos-sample-api</artifactId>
+  </dependency>
+  <dependency>
+      <groupId>com.alibaba.boot</groupId>
+      <artifactId>nacos-discovery-spring-boot-starter</artifactId>
+      <version>0.2.4</version>
+      <exclusions>
+          <exclusion>
+              <groupId>com.alibaba.spring</groupId>
+              <artifactId>spring-context-support</artifactId>
+          </exclusion>
+      </exclusions>
+  </dependency>
+  <dependency>
+      <groupId>org.apache.dubbo</groupId>
+      <artifactId>dubbo-spring-boot-starter</artifactId>
+      <version>2.7.5</version>
+  </dependency>
+  ```
+
+  上述依赖包的简单说明如下：
+
+  - dubbo-spring-boot-starter，Dubbo 的 Starter 组件，添加 Dubbo 依赖。
+  - nacos-discovery-spring-boot-starter，Nacos 的 Starter 组件。
+  - nacos-sample-api，接口定义类的依赖。
+
+- 创建 HelloServiceImpl 类，实现 IHelloService 接口。
+
+  ```java
+  @Service
+  public class HelloServiceImpl implements IHelloService {
+      @Override
+      public String sayHello(String name) {
+          return "Hello World:" + name;
+      }
+  }
+  ```
+
+- 修改 application.properties 配置。仅将 dubbo.registry.address 中配置的协议改成了 `nacos://127.0.0.1:8848`，基于 Nacos 协议。
+
+  ```properties
+  dubbo.application.name=spring-boot-dubbo-nacos-sample
+  dubbo.registry.address=nacos://127.0.0.1:8848
+  
+  dubbo.protocol.name=dubbo
+  dubbo.protocol.port=20880
+  ```
+
+- 运行 Spring Boot 启动类，注意需要声明 `@DubboComponentScan`。
+
+  服务启动成功后，访问 Nacos 控制台，进入 “服务管理” → “服务列表”，可以看到所有注册在 Nacos 上的服务。
+
+## 5.5 Spring Cloud Alibaba Nacos Discovery
+
+Nacos 作为 Spring Cloud Alibaba 中服务注册与发现的核心组件，可以很好地帮助开发者将服务自动注册到 Nacos 服务端，并且能够动态感知和刷新某个服务实例的服务列表。使用 Spring Cloud Alibaba Nacos Discovery 可以基于 Spring Cloud 规范快速接入 Nacos，实现服务注册与发现功能。
+
+在本节中，我们通过将 Spring Cloud Alibaba Nacos Discovery 集成到 Spring Cloud Alibaba Dubbo，完成服务注册与发现的功能。
+
+### 5.5.1 服务端开发
+
+创建一个普通的 Maven 项目 spring-cloud-nacos-sample，在项目中添加两个模块：
+
+- spring-cloud-nacos-sample-api，暴露服务接口，作为服务提供者及服务消费者的接口契约。
+- spring-cloud-nacos-sample-provider，项目类型为 Spring Cloud，它是接口的实现。
+
+项目的创建方式和类型与前面所演示的步骤一样。服务提供方的操作步骤如下：
+
+- 在 spring-cloud-nacos-sample-api 项目中定义一个接口 IHelloService。
+- 
